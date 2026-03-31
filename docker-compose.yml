@@ -1,0 +1,307 @@
+# ============================================================
+# TaaSim — Transport as a Service: Docker Compose Stack
+# Services: Kafka (KRaft) · MinIO · Cassandra · Flink · Spark · Grafana
+# ============================================================
+
+networks:
+  taasim-net:
+    driver: bridge
+
+volumes:
+  kafka-data:
+  minio-data:
+  cassandra-data:
+  grafana-data:
+
+services:
+
+  # ──────────────────────────────────────────────
+  # 1. KAFKA — KRaft mode (no Zookeeper)
+  # ──────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: taasim-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      # KRaft configuration
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Cluster — must be a valid base64 22-char string
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      # Topic defaults
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 4
+      # Retention — 7 days for raw topics
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    user: root
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - taasim-net
+    healthcheck:
+      test: /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ──────────────────────────────────────────────
+  # 2. MINIO — S3-compatible object store
+  # ──────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: taasim-minio
+    hostname: minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # MinIO bucket initializer — creates raw, curated, ml, kafka-archive buckets
+  minio-init:
+    image: minio/mc:latest
+    container_name: taasim-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing myminio/raw;
+      mc mb --ignore-existing myminio/curated;
+      mc mb --ignore-existing myminio/ml;
+      mc mb --ignore-existing myminio/kafka-archive;
+      echo '=== MinIO buckets created ===';
+      mc ls myminio;
+      exit 0;
+      "
+    networks:
+      - taasim-net
+
+  # ──────────────────────────────────────────────
+  # 3. CASSANDRA — NoSQL serving layer
+  # ──────────────────────────────────────────────
+  cassandra:
+    image: cassandra:4.1
+    container_name: taasim-cassandra
+    hostname: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: TaaSimCluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_RACK: rack1
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'SELECT now() FROM system.local' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  # Cassandra schema initializer — creates keyspace and tables
+  cassandra-init:
+    image: cassandra:4.1
+    container_name: taasim-cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ./config/cassandra-init.cql:/init.cql
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for Cassandra...';
+      cqlsh cassandra 9042 -f /init.cql;
+      echo '=== Cassandra schema initialized ===';
+      "
+    networks:
+      - taasim-net
+
+  # ──────────────────────────────────────────────
+  # 4. FLINK — Stream processing (1 JM + 1 TM)
+  # ──────────────────────────────────────────────
+  flink-jobmanager:
+    image: flink:1.18-scala_2.12-java11
+    container_name: taasim-flink-jm
+    hostname: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        state.backend: rocksdb
+        state.checkpoints.dir: s3://curated/flink-checkpoints
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin
+    volumes:
+      - ./jars/flink:/opt/flink/lib/extra
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  flink-taskmanager:
+    image: flink:1.18-scala_2.12-java11
+    container_name: taasim-flink-tm
+    hostname: flink-taskmanager
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        state.backend: rocksdb
+        state.checkpoints.dir: s3://curated/flink-checkpoints
+        s3.endpoint: http://minio:9000
+        s3.path-style-access: true
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin
+    volumes:
+      - ./jars/flink:/opt/flink/lib/extra
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+    networks:
+      - taasim-net
+
+  # ──────────────────────────────────────────────
+  # 5. SPARK — Batch processing + ML (master + worker)
+  # ──────────────────────────────────────────────
+  spark-master:
+    image: apache/spark:3.5.4-python3
+    container_name: taasim-spark-master
+    hostname: spark-master
+    ports:
+      - "8080:8080"   # Spark UI
+      - "7077:7077"   # Spark master port
+      - "4040:4040"   # Spark application UI
+    user: root
+    command: /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_MASTER_HOST: spark-master
+    volumes:
+      - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ./jars/spark:/opt/spark/jars/extra
+      - ./notebooks:/opt/notebooks
+      - ./scripts:/opt/scripts
+      - ./data:/opt/data
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  spark-worker:
+    image: apache/spark:3.5.4-python3
+    container_name: taasim-spark-worker
+    hostname: spark-worker
+    user: root
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 2g --cores 2
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_MEMORY: 2g
+      SPARK_WORKER_CORES: 2
+    volumes:
+      - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ./jars/spark:/opt/spark/jars/extra
+      - ./notebooks:/opt/notebooks
+      - ./scripts:/opt/scripts
+      - ./data:/opt/data
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    networks:
+      - taasim-net
+
+  # ──────────────────────────────────────────────
+  # 6. GRAFANA — Dashboards & monitoring
+  # ──────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: taasim-grafana
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ──────────────────────────────────────────────
+  # 7. JUPYTER — Notebook environment for EDA
+  # ──────────────────────────────────────────────
+  jupyter:
+    image: jupyter/pyspark-notebook:latest
+    container_name: taasim-jupyter
+    hostname: jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      PYSPARK_DRIVER_PYTHON: jupyter
+      PYSPARK_DRIVER_PYTHON_OPTS: "lab"
+      SPARK_MASTER: spark://spark-master:7077
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./data:/home/jovyan/data
+      - ./config/spark-defaults.conf:/home/jovyan/spark-defaults.conf
+      - ./jars/spark:/home/jovyan/extra-jars
+    networks:
+      - taasim-net
+    depends_on:
+      spark-master:
+        condition: service_healthy
