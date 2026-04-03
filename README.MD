@@ -23,6 +23,12 @@
 
 ## 🚨 The Problem
 
+<div align="center">
+<img src="IMG/painpoint.png" alt="Urban Mobility Pain Points — Fragmented Reality vs TaaSim Unified Data Layer" width="750"/>
+</div>
+
+<br/>
+
 **Casablanca is a city of 4 million people with zero shared mobility data.**
 
 Despite significant investment in formal transit — the BRT corridor along Boulevard Mohammed VI, ONCF suburban rail, and thousands of licensed taxis — urban mobility remains deeply fragmented:
