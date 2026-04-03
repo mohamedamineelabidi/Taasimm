@@ -421,7 +421,7 @@ MIT License. Datasets used under their respective open licenses (CC BY 4.0, Publ
 
 <div align="center">
 
-*Built with data engineering. Powered by open source.*
+*Built by **Mohamed Amine El Abidi** — Powered by open source.*
 
 **TaaSim** — *The data platform that moves Casablanca.*
 
