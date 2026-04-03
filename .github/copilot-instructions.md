@@ -44,6 +44,15 @@
   - Sprint1.md
   - documents/00_master_status.md
 
+## Change Tracking (Commit & Push)
+- Every edit — even a small one — must be committed and pushed to the repo.
+- Before committing, update the relevant task document under documents/ to reflect the change.
+- Use clear, descriptive commit messages in the format: [task-N] short description
+  - Example: [task-4] fix zone centroid lat for Mechouar
+  - Example: [infra] add healthcheck retry to cassandra service
+- After pushing, add a one-line entry to documents/06_next_steps.md under the Update Log section.
+- Never push without verifying the change works locally first (run, test, or validate).
+
 ## Practical Pitfalls
 - If Kafka tests fail with NoBrokersAvailable, check Docker daemon and broker availability first.
 - Prefer fixing runtime availability issues before changing producer logic.
