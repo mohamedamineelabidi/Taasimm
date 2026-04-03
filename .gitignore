@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Large data files (stored in MinIO, not Git)
+data/train.csv
+data/nyc-tlc/
+data/remapped_trips_sample.csv
+
+# JARs (downloaded via scripts, not tracked)
+jars/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
