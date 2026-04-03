@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="IMG/projectoverview.png" alt="TaaSim Urban Mobility Data Platform" width="850"/>
+
 # TaaSim — Transport as a Service
 
 **Real-time urban mobility simulation platform for Casablanca, Morocco**
@@ -77,12 +79,6 @@ TaaSim treats urban mobility as a **data engineering problem**. By ingesting GPS
 ## 🏗️ Architecture
 
 TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink handles all real-time processing, and Spark operates exclusively offline for batch ETL and ML training.
-
-<div align="center">
-<img src="IMG/projectoverview.png" alt="TaaSim Urban Mobility Data Platform — Architecture Overview" width="750"/>
-</div>
-
-<br/>
 
 ### System Components
 
