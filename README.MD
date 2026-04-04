@@ -81,7 +81,7 @@ TaaSim treats urban mobility as a **data engineering problem**. By ingesting GPS
 TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink handles all real-time processing, and Spark operates exclusively offline for batch ETL and ML training.
 
 <div align="center">
-<img src="img/archi_tassim.png" alt="TaaSim Architecture — Ingestion, Kafka, Flink, Cassandra, MinIO, Spark, FastAPI, Grafana" width="850"/>
+<img src="IMG/archi_tassim.png" alt="TaaSim Architecture — Ingestion, Kafka, Flink, Cassandra, MinIO, Spark, FastAPI, Grafana" width="850"/>
 </div>
 
 <br/>
