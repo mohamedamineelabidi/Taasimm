@@ -101,6 +101,12 @@ TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink
 
 ### Real-Time Processing Pipeline
 
+<div align="center">
+<img src="IMG/streamproce_architec.png" alt="Stream Processing — Apache Flink Real-Time Topologies (GPS Normalizer, Demand Aggregator, Trip Matcher)" width="850"/>
+</div>
+
+<br/>
+
 | Flink Job | Input | Processing | Output |
 |:----------|:------|:-----------|:-------|
 | **GPS Normalizer** | `raw.gps` | Validate → deduplicate → watermark (3-min lateness) → zone mapping → centroid snap | `vehicle_positions` table + `processed.gps` |
