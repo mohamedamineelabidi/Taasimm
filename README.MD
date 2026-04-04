@@ -17,13 +17,13 @@
 
 ---
 
-[Problem](#-the-problem) · [Solution](#-the-solution) · [Architecture](#-architecture) · [Quick Start](#-quick-start) · [Tech Stack](#-technology-stack) · [Data Pipeline](#-data-pipeline) · [ML Model](#-machine-learning) · [Project Structure](#-project-structure) · [Roadmap](#-roadmap)
+[Problem](#the-problem) · [Solution](#the-solution) · [Architecture](#architecture) · [Quick Start](#quick-start) · [Tech Stack](#technology-stack) · [Data Pipeline](#data-pipeline) · [ML Model](#machine-learning) · [Project Structure](#project-structure) · [Roadmap](#roadmap)
 
 </div>
 
 ---
 
-## 🚨 The Problem
+## The Problem
 
 <div align="center">
 <img src="IMG/painpoint.png" alt="Urban Mobility Pain Points — Fragmented Reality vs TaaSim Unified Data Layer" width="750"/>
@@ -41,42 +41,42 @@ Despite significant investment in formal transit — the BRT corridor along Boul
 | **Demand blindness** | Drivers cruise looking for passengers; passengers wait with no visibility of vehicle availability |
 | **No interoperability** | Formal transit (ONCF, BRT) and informal taxis share no data, no ticketing, no trip planner |
 | **Cash-only economy** | Zero payment data means zero trip history, zero analytics, zero personalization |
-| **Underserved periphery** | New districts (Bouskoura, Ain Sebaâ, Sidi Moumen) grow faster than routes are planned |
+| **Underserved periphery** | New districts (Bouskoura, Ain Sebaa, Sidi Moumen) grow faster than routes are planned |
 
 > **The core problem is not a shortage of vehicles — it is the total absence of a data layer connecting supply to demand.**
 
 ---
 
-## 💡 The Solution
+## The Solution
 
-TaaSim treats urban mobility as a **data engineering problem**. By ingesting GPS vehicle streams, processing trip reservations in real time, and applying machine learning to historical patterns, TaaSim can:
+TaaSim treats urban mobility as a **data engineering problem**. By ingesting GPS vehicle streams, processing trip reservations in real time, and applying machine learning to historical patterns, the platform delivers:
 
-- **Match riders to vehicles dynamically** — find the nearest available taxi in < 5 seconds
-- **Forecast demand surges** — predict trip volume per zone 30 minutes ahead
-- **Give city planners a unified view** — live heatmaps, KPI dashboards, coverage gap analysis
-- **Enable data-driven route planning** — identify underserved zones where demand exceeds supply
+- **Dynamic rider-vehicle matching** — nearest available taxi found in under 5 seconds
+- **Demand surge forecasting** — trip volume predicted per zone, 30 minutes ahead
+- **Unified city-wide visibility** — live heatmaps, KPI dashboards, coverage gap analysis
+- **Data-driven route planning** — identification of underserved zones where demand exceeds supply
 
 ### How It Works
 
 ```
   Rider requests a trip                    Driver receives match
-         │                                         ▲
-         ▼                                         │
-  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
-  │  Kafka Bus   │───▶│  Flink Jobs  │───▶│   Cassandra DB  │
-  │  (raw events)│    │  (real-time) │    │  (serving layer) │
-  └──────┬───────┘    └──────┬───────┘    └────────┬────────┘
-         │                   │                     │
-         ▼                   ▼                     ▼
-  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
-  │  MinIO Lake  │───▶│  Spark ML   │───▶│  FastAPI + Grafana│
-  │  (archive)   │    │  (forecast) │    │  (dashboard + API)│
-  └─────────────┘    └──────────────┘    └─────────────────┘
+         |                                         ^
+         v                                         |
+  +--------------+    +---------------+    +------------------+
+  |  Kafka Bus   |--->|  Flink Jobs   |--->|   Cassandra DB   |
+  |  (raw events)|    |  (real-time)  |    |  (serving layer) |
+  +------+-------+    +------+--------+    +--------+---------+
+         |                   |                      |
+         v                   v                      v
+  +--------------+    +---------------+    +------------------+
+  |  MinIO Lake  |--->|  Spark ML     |--->| FastAPI + Grafana|
+  |  (archive)   |    |  (forecast)   |    | (dashboard + API)|
+  +--------------+    +---------------+    +------------------+
 ```
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink handles all real-time processing, and Spark operates exclusively offline for batch ETL and ML training.
 
@@ -90,41 +90,41 @@ TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink
 
 | Layer | Technology | Role |
 |:------|:-----------|:-----|
-| **Event Bus** | Apache Kafka 3.7.0 (KRaft) | Central nervous system: GPS pings + trip reservations stream through Kafka with 7-day retention |
-| **Stream Processing** | Apache Flink 1.18 | 3 real-time jobs: GPS normalization, demand aggregation (30s windows), trip matching |
-| **Object Store** | MinIO (S3-compatible) | Data lake with 4 zones: `raw/`, `curated/`, `ml/`, `kafka-archive/` |
-| **Batch + ML** | Apache Spark 3.5.4 | ETL on 1.7M Porto trips + 30M NYC rides; GBT demand forecasting |
+| **Event Bus** | Apache Kafka 3.7.0 (KRaft) | Central nervous system — GPS pings and trip reservations stream through Kafka with 7-day retention |
+| **Stream Processing** | Apache Flink 1.18 | Three real-time jobs: GPS normalization, demand aggregation (30s windows), trip matching |
+| **Object Store** | MinIO (S3-compatible) | Data lake with four zones: `raw/`, `curated/`, `ml/`, `kafka-archive/` |
+| **Batch + ML** | Apache Spark 3.5.4 | ETL on 1.7M Porto trips and 30M NYC rides; GBT demand forecasting |
 | **Serving DB** | Apache Cassandra 4.1 | Low-latency queries: vehicle positions, trip records, demand per zone |
 | **Dashboard** | Grafana 10.4.0 | Live vehicle map, demand heatmap, KPI panels, ML forecast overlay |
-| **API** | FastAPI (Python) | REST endpoints: trip reservation, vehicle lookup, demand forecast. JWT auth |
+| **API** | FastAPI (Python) | REST endpoints: trip reservation, vehicle lookup, demand forecast — JWT auth |
 | **Notebooks** | Jupyter Lab | EDA, zone remapping analysis, model evaluation |
 
 ### Real-Time Processing Pipeline
 
 <div align="center">
-<img src="IMG/streamproce_architec.png" alt="Stream Processing — Apache Flink Real-Time Topologies (GPS Normalizer, Demand Aggregator, Trip Matcher)" width="850"/>
+<img src="IMG/streamproce_architec.png" alt="Stream Processing — Apache Flink Real-Time Topologies" width="850"/>
 </div>
 
 <br/>
 
 | Flink Job | Input | Processing | Output |
 |:----------|:------|:-----------|:-------|
-| **GPS Normalizer** | `raw.gps` | Validate → deduplicate → watermark (3-min lateness) → zone mapping → centroid snap | `vehicle_positions` table + `processed.gps` |
-| **Demand Aggregator** | `processed.gps` + `raw.trips` | 30s tumbling window per zone → vehicle count + request count → supply/demand ratio | `demand_zones` table + `processed.demand` |
-| **Trip Matcher** | `raw.trips` + `processed.gps` | Find nearest vehicle in zone → 5s adjacent zone fallback → assign match → compute ETA | `trips` table + `processed.matches` |
+| **GPS Normalizer** | `raw.gps` | Validate, deduplicate, watermark (3-min lateness), zone mapping, centroid snap | `vehicle_positions` table + `processed.gps` |
+| **Demand Aggregator** | `processed.gps` + `raw.trips` | 30s tumbling window per zone, vehicle count + request count, supply/demand ratio | `demand_zones` table + `processed.demand` |
+| **Trip Matcher** | `raw.trips` + `processed.gps` | Find nearest vehicle in zone, 5s adjacent zone fallback, assign match, compute ETA | `trips` table + `processed.matches` |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - **Docker Desktop** (Engine 28.x+) — [Install](https://www.docker.com/products/docker-desktop/)
 - **Python 3.13+** — [Install](https://www.python.org/downloads/)
 - **Git** — [Install](https://git-scm.com/)
-- **8 GB RAM minimum** for running the full stack
+- **8 GB RAM minimum** for the full stack
 
-### 1. Clone & Setup
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/mohamedamineelabidi/Taasimm.git
@@ -150,18 +150,17 @@ docker compose up -d
 Wait for all healthchecks to pass (~60 seconds):
 
 ```
-✔ taasim-kafka         Started
-✔ taasim-minio         Healthy     (7s)
-✔ taasim-cassandra     Healthy    (33s)
-✔ taasim-flink-jm      Healthy    (17s)
-✔ taasim-spark-master   Healthy    (18s)
-✔ taasim-grafana       Started
-✔ taasim-jupyter       Started
+taasim-kafka         Started
+taasim-minio         Healthy     (7s)
+taasim-cassandra     Healthy    (33s)
+taasim-flink-jm      Healthy    (17s)
+taasim-spark-master  Healthy    (18s)
+taasim-grafana       Started
+taasim-jupyter       Started
 ```
 
 ### 4. Upload Datasets to MinIO
 
-Download the datasets manually, then upload:
 ```powershell
 .\upload-datasets.ps1
 ```
@@ -174,17 +173,13 @@ Download the datasets manually, then upload:
 ### 5. Run Producers (Smoke Test)
 
 ```bash
-# Create Python virtual environment
 python -m venv .venv
 .venv/Scripts/activate    # Windows
 # source .venv/bin/activate  # Linux/Mac
 
 pip install kafka-python numpy
 
-# GPS event simulator (5 sample trips)
 python producers/vehicle_gps_producer.py --max-trips 5
-
-# Trip request simulator (5 sample trips)
 python producers/trip_request_producer.py --max-trips 5
 ```
 
@@ -192,38 +187,38 @@ python producers/trip_request_producer.py --max-trips 5
 
 | Service | URL | Credentials |
 |:--------|:----|:------------|
-| **Grafana Dashboard** | http://localhost:3000 | admin / admin |
-| **Flink Web UI** | http://localhost:8081 | — |
-| **Spark Master UI** | http://localhost:8080 | — |
-| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
-| **Jupyter Lab** | http://localhost:8888 | token from `docker logs taasim-jupyter` |
+| Grafana Dashboard | http://localhost:3000 | admin / admin |
+| Flink Web UI | http://localhost:8081 | — |
+| Spark Master UI | http://localhost:8080 | — |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| Jupyter Lab | http://localhost:8888 | token from `docker logs taasim-jupyter` |
 
 ---
 
-## 🔧 Technology Stack
+## Technology Stack
 
-### Infrastructure (11 Docker Containers)
+### Infrastructure — 11 Docker Containers
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Compose Stack                       │
-│                                                               │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌────────────┐  │
-│  │  Kafka   │  │  MinIO   │  │ Cassandra │  │  Grafana   │  │
-│  │  KRaft   │  │  S3 API  │  │   4.1     │  │   10.4     │  │
-│  │  3.7.0   │  │  Console │  │           │  │            │  │
-│  └──────────┘  └──────────┘  └───────────┘  └────────────┘  │
-│                                                               │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────┐  │
-│  │   Flink 1.18     │  │   Spark 3.5.4    │  │  Jupyter   │  │
-│  │  JM + TM (4 slots)│  │  Master + Worker │  │   Lab      │  │
-│  └──────────────────┘  └──────────────────┘  └────────────┘  │
-│                                                               │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐                   │
-│  │ minio-   │  │cassandra-│  │  spark-   │                   │
-│  │ init     │  │ init     │  │  worker   │                   │
-│  └──────────┘  └──────────┘  └───────────┘                   │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                    Docker Compose Stack                      |
+|                                                             |
+|  +----------+  +----------+  +-----------+  +------------+  |
+|  |  Kafka   |  |  MinIO   |  | Cassandra |  |  Grafana   |  |
+|  |  KRaft   |  |  S3 API  |  |   4.1     |  |   10.4     |  |
+|  |  3.7.0   |  |  Console |  |           |  |            |  |
+|  +----------+  +----------+  +-----------+  +------------+  |
+|                                                             |
+|  +------------------+  +------------------+  +------------+  |
+|  |   Flink 1.18     |  |   Spark 3.5.4   |  |  Jupyter   |  |
+|  |  JM + TM (4 slots)|  |  Master + Worker|  |   Lab      |  |
+|  +------------------+  +------------------+  +------------+  |
+|                                                             |
+|  +----------+  +----------+  +-----------+                  |
+|  | minio-   |  |cassandra-|  |  spark-   |                  |
+|  | init     |  | init     |  |  worker   |                  |
+|  +----------+  +----------+  +-----------+                  |
++-------------------------------------------------------------+
 ```
 
 ### Key JAR Dependencies
@@ -238,17 +233,17 @@ python producers/trip_request_producer.py --max-trips 5
 
 ---
 
-## 📊 Data Pipeline
+## Data Pipeline
 
 ### Datasets
 
-**Porto Taxi Trajectories** (Primary — Streaming)
+**Porto Taxi Trajectories** — Primary (Streaming)
 - 1.7 million completed taxi trips from 442 taxis in Porto, Portugal
 - 12 months of GPS traces (July 2013 – June 2014)
 - GPS coordinates every 15 seconds per trip
-- 3 call types: A (dispatched), B (taxi stand), C (street hail) — mirrors Casablanca taxi behavior
+- Three call types: A (dispatched), B (taxi stand), C (street hail) — mirrors Casablanca taxi behavior
 
-**NYC TLC Trip Records** (Secondary — Batch)
+**NYC TLC Trip Records** — Secondary (Batch)
 - ~10 million rows per month, 3 months used (~30M total)
 - Used for Spark ETL at scale and KPI computation
 
@@ -257,31 +252,31 @@ python producers/trip_request_producer.py --max-trips 5
 Porto GPS coordinates are linearly transformed to Casablanca's bounding box, mapped to **16 irregular zones** matching real arrondissements:
 
 ```
-         North ─────────────────────────────────────
-         │  13-Anfa  │ 14-Sidi   │ 15-Ain  │ 16-Sidi    │
-         │           │  Belyout  │  Sebaa  │  Bernoussi │
-         ├───────────┼──────┼────┼─────────┼────────────┤
-Center   │ 8-Maarif │9-Mech│10-Al│11-Mers  │12-Hay      │
-         │          │ouar  │Fida │ Sultan  │ Mohammadi  │
-         ├──────────┼──────┴──┼──┴────┼────┴────────────┤
-Mid-S    │4-Hay     │ 5-Ain   │6-Ben  │ 7-Moulay       │
-         │ Hassani  │  Chock  │ Msik  │  Rachid        │
-         ├──────────┼─────────┼───────┼────────────────┤
-South    │ 1-Bouskoura       │2-Sbata│ 3-Sidi Moumen  │
-         └───────────────────┴───────┴────────────────┘
-                    West ←→ East
+         North -----------------------------------------------
+         |  13-Anfa  | 14-Sidi   | 15-Ain  | 16-Sidi        |
+         |           |  Belyout  |  Sebaa  |  Bernoussi     |
+         +-----------+------+----+---------+----------------+
+Center   | 8-Maarif |9-Mech|10-Al| 11-Mers | 12-Hay         |
+         |          |ouar  |Fida |  Sultan | Mohammadi      |
+         +----------+------+--+--+----+----+----------------+
+Mid-S    |4-Hay     | 5-Ain   |6-Ben  | 7-Moulay           |
+         | Hassani  |  Chock  | Msik  |  Rachid            |
+         +----------+---------+-------+--------------------+
+South    | 1-Bouskoura       |2-Sbata| 3-Sidi Moumen      |
+         +-------------------+-------+--------------------+
+                    West <---> East
 ```
 
 ### Kafka Topic Flow
 
 ```
 Producers                    Flink                      Cassandra
-─────────                    ─────                      ─────────
-vehicle_gps_producer ──▶ raw.gps ──▶ Job 1 ──▶ processed.gps ──▶ vehicle_positions
-                                          │
-trip_request_producer ──▶ raw.trips ──▶ Job 2 ──▶ processed.demand ──▶ demand_zones
-                              │
-                              └──▶ Job 3 ──▶ processed.matches ──▶ trips
+---------                    -----                      ---------
+vehicle_gps_producer --> raw.gps --> Job 1 --> processed.gps --> vehicle_positions
+                                          |
+trip_request_producer --> raw.trips --> Job 2 --> processed.demand --> demand_zones
+                              |
+                              +--> Job 3 --> processed.matches --> trips
 ```
 
 ### Cassandra Schema
@@ -294,7 +289,7 @@ trip_request_producer ──▶ raw.trips ──▶ Job 2 ──▶ processed.de
 
 ---
 
-## 🤖 Machine Learning
+## Machine Learning
 
 ### Demand Forecasting Model
 
@@ -323,7 +318,7 @@ POST /api/demand/forecast
   "zone_id": 8,
   "datetime": "2026-04-04T08:30:00"
 }
-──▶
+-->
 {
   "zone_id": 8,
   "zone_name": "Maarif",
@@ -334,11 +329,11 @@ POST /api/demand/forecast
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Taasimm/
-├── docker-compose.yml              # Full stack (11 containers)
+├── docker-compose.yml              # Full stack definition (11 containers)
 ├── download-jars.ps1               # JAR downloader (Windows)
 ├── download-jars.sh                # JAR downloader (Linux/Mac)
 ├── upload-datasets.ps1             # Dataset upload to MinIO
@@ -348,13 +343,13 @@ Taasimm/
 │   └── spark-defaults.conf         # S3A configuration
 │
 ├── producers/
-│   ├── config.py                   # Shared constants & transforms
+│   ├── config.py                   # Shared constants and transforms
 │   ├── vehicle_gps_producer.py     # GPS event simulator
 │   └── trip_request_producer.py    # Trip request simulator
 │
 ├── notebooks/
 │   ├── 01_porto_eda.ipynb          # Porto data exploration
-│   ├── 02_zone_remapping.ipynb     # v3 zone transformation
+│   ├── 02_zone_remapping.ipynb     # Zone transformation (v3)
 │   └── casablanca_zone_map.html    # Interactive zone visualization
 │
 ├── data/
@@ -363,7 +358,7 @@ Taasimm/
 │
 ├── documents/                      # Task status documentation
 │   ├── 00_master_status.md
-│   ├── 01–05_task_*.md
+│   ├── 01-05_task_*.md
 │   └── 06_next_steps.md
 │
 ├── jars/                           # Downloaded JARs (gitignored)
@@ -371,59 +366,59 @@ Taasimm/
 │   └── spark/                      # hadoop-aws, aws-sdk-bundle
 │
 └── .github/
-    └── copilot-instructions.md     # AI coding guidelines
+    └── copilot-instructions.md     # Development guidelines
 ```
 
 ---
 
-## 🎯 Performance Targets
+## Performance Targets
 
-| Metric | Target | How Measured |
-|:-------|:-------|:-------------|
-| Trip match latency | < 5s P95 | Kafka timestamp → Cassandra write |
-| GPS position freshness | < 15s | Producer timestamp → Cassandra write |
+| Metric | Target | Measurement |
+|:-------|:-------|:------------|
+| Trip match latency | < 5s (P95) | Kafka timestamp to Cassandra write |
+| GPS position freshness | < 15s | Producer timestamp to Cassandra write |
 | Demand zone updates | Every 30s | `WRITETIME()` in Cassandra |
 | ML forecast API | < 500ms at 20 req/s | Locust load test |
 | Spark ETL (1.7M rows) | < 5 min | Spark UI job duration |
 
 ---
 
-## 🗓️ Roadmap
+## Roadmap
 
 | Week | Focus | Status |
 |:-----|:------|:-------|
-| 1 | Docker stack, datasets, EDA, zone remapping, Kafka producers | ✅ Done |
-| 2 | Kafka Connect S3 Sink, Cassandra ADR, storage design | 🔄 Next |
-| 3 | Flink Job 1 (GPS normalizer), watermarks, Grafana vehicle map | ⬜ |
-| 4 | Flink Job 2 (demand) + Job 3 (trip matcher), adjacent zone fallback | ⬜ |
-| 5 | Spark ETL on Porto + NYC, KPI computation | ⬜ |
-| 6 | ML feature engineering, GBT training, FastAPI forecast endpoint | ⬜ |
-| 7 | JWT auth, GPS anonymization, integration testing, SLA measurement | ⬜ |
-| 8 | Grafana polish, live demo, pitch deck, technical report | ⬜ |
+| 1 | Docker stack, datasets, EDA, zone remapping, Kafka producers | Done |
+| 2 | Kafka Connect S3 Sink, Cassandra ADR, storage design | Next |
+| 3 | Flink Job 1 (GPS normalizer), watermarks, Grafana vehicle map | Planned |
+| 4 | Flink Job 2 (demand) + Job 3 (trip matcher), adjacent zone fallback | Planned |
+| 5 | Spark ETL on Porto + NYC, KPI computation | Planned |
+| 6 | ML feature engineering, GBT training, FastAPI forecast endpoint | Planned |
+| 7 | JWT auth, GPS anonymization, integration testing, SLA measurement | Planned |
+| 8 | Grafana polish, live demo, pitch deck, technical report | Planned |
 
 ---
 
-## 🏆 Key Differentiators
+## Key Differentiators
 
-| Capability | Why It Matters |
-|:-----------|:---------------|
-| **Real-time matching** | Riders matched to nearest vehicle in < 5 seconds — eliminates blind cruising |
+| Capability | Impact |
+|:-----------|:-------|
+| **Real-time matching** | Riders matched to nearest vehicle in under 5 seconds — eliminates blind cruising |
 | **Demand forecasting** | ML predicts demand 30 minutes ahead — enables proactive fleet positioning |
 | **Zone-level analytics** | 16 Casablanca zones with live supply/demand ratio — exposes underserved areas |
-| **Fault-tolerant streaming** | Flink checkpointing + at-least-once guarantees — zero data loss on failure |
+| **Fault-tolerant streaming** | Flink checkpointing with at-least-once guarantees — zero data loss on failure |
 | **Scalable architecture** | Kappa architecture handles 10K+ events/sec — ready for city-wide deployment |
 
 ### Production Readiness Checklist
 
-1. GPS events: Kafka → Flink → Cassandra → Grafana vehicle map (updating live)
-2. Trip reservation: `POST /api/trips` → match in < 5 seconds
-3. Demand heatmap: Grafana updating every 30s per zone
-4. ML forecast: API responds < 500ms, beats naive baseline
-5. Checkpoint recovery: kill Flink TM → job resumes from checkpoint
+1. GPS events flow end-to-end: Kafka → Flink → Cassandra → Grafana vehicle map (updating live)
+2. Trip reservation: `POST /api/trips` → match returned in under 5 seconds
+3. Demand heatmap: Grafana updating every 30 seconds per zone
+4. ML forecast: API responds in under 500ms, beats naive baseline
+5. Checkpoint recovery: Flink TaskManager restart → job resumes from checkpoint
 
 ---
 
-## 📚 References
+## References
 
 - **Porto Taxi Trajectories** — [ECML/PKDD 2015 Challenge](https://www.kaggle.com/c/pkdd-15-predict-taxi-service-trajectory-i) (CC BY 4.0)
 - **NYC TLC Trip Records** — [NYC Open Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) (Public Domain)
@@ -433,7 +428,7 @@ Taasimm/
 
 ---
 
-## 📝 License
+## License
 
 MIT License. Datasets used under their respective open licenses (CC BY 4.0, Public Domain).
 
@@ -441,8 +436,8 @@ MIT License. Datasets used under their respective open licenses (CC BY 4.0, Publ
 
 <div align="center">
 
-*Built by **Mohamed Amine El Abidi** — Powered by open source.*
+Built by **Mohamed Amine El Abidi**
 
-**TaaSim** — *The data platform that moves Casablanca.*
+**TaaSim** — The data platform that moves Casablanca.
 
 </div>
