@@ -256,13 +256,14 @@ Porto GPS coordinates are linearly transformed to Casablanca's bounding box, map
          |  13-Anfa  | 14-Sidi   | 15-Ain  | 16-Sidi        |
          |           |  Belyout  |  Sebaa  |  Bernoussi     |
          +-----------+------+----+---------+----------------+
-Center   | 8-Maarif |9-Mech|10-Al| 11-Mers | 12-Hay         |
-         |          |ouar  |Fida |  Sultan | Mohammadi      |
-         +----------+------+--+--+----+----+----------------+
-Mid-S    |4-Hay     | 5-Ain   |6-Ben  | 7-Moulay           |
-         | Hassani  |  Chock  | Msik  |  Rachid            |
+Center   | 8-Maarif |9-Al  |10-Mers| 11-Roch | 12-Hay       |
+         |          |Fida  |Sultan |  Noires | Mohammadi    |
+         +----------+------+--+---+----+----+----------------+
+Mid-S    |4-Hay     | 5-Sbata |6-Ben  | 7-Moulay           |
+         | Hassani  |         | Msik  |  Rachid            |
          +----------+---------+-------+--------------------+
-South    | 1-Bouskoura       |2-Sbata| 3-Sidi Moumen      |
+South    | 1-Ain Chock       |2-Sidi | 3-Sidi Moumen      |
+         |                   |Othmane|                     |
          +-------------------+-------+--------------------+
                     West <---> East
 ```

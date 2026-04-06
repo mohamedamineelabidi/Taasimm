@@ -295,7 +295,7 @@ Taasimm/
 ### Commit Convention
 - Every edit — even small — must be committed and pushed
 - Format: `[scope] short description`
-  - `[task-N]` for sprint tasks, e.g. `[task-4] fix zone centroid lat for Mechouar`
+  - `[task-N]` for sprint tasks, e.g. `[task-4] fix zone centroid lat for Al Fida`
   - `[infra]` for infrastructure, e.g. `[infra] add healthcheck retry to cassandra`
   - `[docs]` for documentation, e.g. `[docs] update master status with week 2 progress`
   - `[fix]` for bug fixes, e.g. `[fix] handle null POLYLINE in GPS producer`
