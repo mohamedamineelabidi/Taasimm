@@ -1,5 +1,5 @@
-# ============================================================
-# TaaSim — Task 2: Download & Upload Datasets to MinIO
+﻿# ============================================================
+# TaaSim - Task 2: Download & Upload Datasets to MinIO
 # Run AFTER docker-compose is up and MinIO is healthy
 # ============================================================
 
@@ -9,16 +9,16 @@ $DATA_DIR = Join-Path $BASE_DIR "data"
 
 New-Item -ItemType Directory -Force -Path $DATA_DIR | Out-Null
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # STEP 1: Download Porto Taxi Trajectories
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 Write-Host ""
 Write-Host "=== STEP 1: Porto Taxi Trajectories ===" -ForegroundColor Cyan
 
 $PORTO_FILE = Join-Path $DATA_DIR "train.csv"
 
 if (Test-Path $PORTO_FILE) {
-    Write-Host "Porto dataset already exists — skipping download." -ForegroundColor Green
+    Write-Host "Porto dataset already exists - skipping download." -ForegroundColor Green
 } else {
     $kaggleExists = Get-Command kaggle -ErrorAction SilentlyContinue
     if ($kaggleExists) {
@@ -60,9 +60,9 @@ if (-not (Test-Path $PORTO_FILE)) {
 $portoSize = [math]::Round((Get-Item $PORTO_FILE).Length / 1MB, 1)
 Write-Host "Porto ready: train.csv ($portoSize MB)" -ForegroundColor Green
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # STEP 2: Download NYC TLC Trip Records (3 months)
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 Write-Host ""
 Write-Host "=== STEP 2: NYC TLC Trip Records ===" -ForegroundColor Cyan
 
@@ -78,7 +78,7 @@ $months = @(
 foreach ($m in $months) {
     $filePath = Join-Path $NYC_DIR $m.file
     if (Test-Path $filePath) {
-        Write-Host "$($m.file) already exists — skipping." -ForegroundColor Green
+        Write-Host "$($m.file) already exists - skipping." -ForegroundColor Green
     } else {
         Write-Host "Downloading $($m.file)..."
         try {
@@ -95,12 +95,12 @@ foreach ($m in $months) {
 Write-Host ""
 Write-Host "NYC TLC files:" -ForegroundColor Green
 Get-ChildItem $NYC_DIR -Filter "*.parquet" | ForEach-Object {
-    Write-Host "  $($_.Name) — $([math]::Round($_.Length / 1MB, 1)) MB"
+    Write-Host "  $($_.Name) - $([math]::Round($_.Length / 1MB, 1)) MB"
 }
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # STEP 3: Upload to MinIO
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 Write-Host ""
 Write-Host "=== STEP 3: Upload datasets to MinIO ===" -ForegroundColor Cyan
 
@@ -113,25 +113,25 @@ Write-Host "Using Docker network: $networkName" -ForegroundColor Gray
 Write-Host "Uploading Porto dataset to MinIO..."
 docker run --rm --network $networkName `
     -v "${DATA_DIR}:/data" `
-    --entrypoint "" `
-    minio/mc sh -c "mc alias set myminio http://minio:9000 minioadmin minioadmin && mc cp /data/train.csv myminio/raw/porto-trips/train.csv"
+    --entrypoint sh `
+    minio/mc -c "mc alias set myminio http://minio:9000 minioadmin minioadmin && mc cp /data/train.csv myminio/raw/porto-trips/train.csv"
 
 # Upload NYC TLC
 Write-Host "Uploading NYC TLC Parquet files to MinIO..."
 docker run --rm --network $networkName `
     -v "${NYC_DIR}:/data/nyc" `
-    --entrypoint "" `
-    minio/mc sh -c "mc alias set myminio http://minio:9000 minioadmin minioadmin && mc cp --recursive /data/nyc/ myminio/raw/nyc-tlc/"
+    --entrypoint sh `
+    minio/mc -c "mc alias set myminio http://minio:9000 minioadmin minioadmin && mc cp --recursive /data/nyc/ myminio/raw/nyc-tlc/"
 
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 # STEP 4: Verify uploads
-# ──────────────────────────────────────────────
+# ----------------------------------------------
 Write-Host ""
 Write-Host "=== STEP 4: Verifying uploads ===" -ForegroundColor Cyan
 
 docker run --rm --network $networkName `
-    --entrypoint "" `
-    minio/mc sh -c "mc alias set myminio http://minio:9000 minioadmin minioadmin; echo '=== All Buckets ==='; mc ls myminio; echo ''; echo '=== Porto Trips ==='; mc ls myminio/raw/porto-trips/; echo ''; echo '=== NYC TLC ==='; mc ls myminio/raw/nyc-tlc/"
+    --entrypoint sh `
+    minio/mc -c "mc alias set myminio http://minio:9000 minioadmin minioadmin; echo '=== All Buckets ==='; mc ls myminio; echo ''; echo '=== Porto Trips ==='; mc ls myminio/raw/porto-trips/; echo ''; echo '=== NYC TLC ==='; mc ls myminio/raw/nyc-tlc/"
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
