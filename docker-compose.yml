@@ -95,7 +95,7 @@ services:
       mc alias set myminio http://minio:9000 minioadmin minioadmin;
       mc mb --ignore-existing myminio/raw;
       mc mb --ignore-existing myminio/curated;
-      mc mb --ignore-existing myminio/ml;
+      mc mb --ignore-existing myminio/mldata;
       mc mb --ignore-existing myminio/kafka-archive;
       echo '=== MinIO buckets created ===';
       mc ls myminio;
@@ -341,7 +341,77 @@ services:
       start_period: 15s
 
   # ──────────────────────────────────────────────
-  # 7. JUPYTER — Notebook environment for EDA
+  # 7. KAFKA CONNECT — S3 Sink to MinIO (archival)
+  # Mirrors raw.gps and raw.trips → kafka-archive/
+  # ──────────────────────────────────────────────
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect-base:7.7.0
+    container_name: taasim-kafka-connect
+    hostname: kafka-connect
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "kafka:9092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: taasim-connect-group
+      CONNECT_CONFIG_STORAGE_TOPIC: _connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: "10000"
+      CONNECT_OFFSET_STORAGE_TOPIC: _connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_TOPIC: _connect-statuses
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_LOG4J_ROOT_LOGLEVEL: WARN
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      # AWS / MinIO credentials for the S3 Sink connector
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    command: >
+      /bin/bash -c "
+      confluent-hub install --no-prompt confluentinc/kafka-connect-s3:10.5.16 &&
+      /etc/confluent/docker/run
+      "
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8083/connectors"]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 180s
+
+  # Registers the S3 Sink connector once Kafka Connect is healthy
+  connect-init:
+    image: curlimages/curl:8.11.0
+    container_name: taasim-connect-init
+    depends_on:
+      kafka-connect:
+        condition: service_healthy
+    volumes:
+      - ./config/kafka-connect:/config
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Registering TaaSim S3 Sink connector...' &&
+      curl -sf http://kafka-connect:8083/connectors/taasim-s3-sink > /dev/null
+        && echo 'Connector already exists, skipping registration.'
+        || curl -sf -X POST http://kafka-connect:8083/connectors -H 'Content-Type: application/json' -d @/config/s3-sink-connector.json &&
+      echo '=== Done ===' &&
+      curl -s http://kafka-connect:8083/connectors
+      "
+    networks:
+      - taasim-net
+
+  # ──────────────────────────────────────────────
+  # 8. JUPYTER — Notebook environment for EDA
   # ──────────────────────────────────────────────
   jupyter:
     image: jupyter/pyspark-notebook:latest

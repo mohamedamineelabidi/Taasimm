@@ -17,6 +17,7 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [x] Task 3: Porto EDA notebook
 - [x] Task 4: Zone remapping Porto -> Casablanca (v5 geographic redesign, Gini 0.275)
 - [x] Task 5: Kafka producers (GPS + trip requests)
+- [x] Task 6 (Week 2): Storage Design — Kafka Connect S3 Sink + Cassandra schema + ADR-001
 
 ## Task Board — Week 2
 
@@ -38,6 +39,7 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [03_task_porto_eda.md](03_task_porto_eda.md)
 - [04_task_zone_remapping_v3.md](04_task_zone_remapping_v3.md)
 - [05_task_kafka_producers.md](05_task_kafka_producers.md)
+<<<<<<< HEAD
 - [06_next_steps.md](06_next_steps.md)
 - [07_adr_v1.md](07_adr_v1.md)
 
@@ -50,3 +52,28 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - Flink Job 1 (GPS Normalizer) running on cluster: raw.gps → validate → zone assign → centroid snap → Cassandra + processed.gps
 - Flink checkpointing to MinIO (s3://curated/flink-checkpoints/) verified — 10+ checkpoints completed
 - Grafana vehicle tracking dashboard deployed with Geomap, zone bar chart, and event table
+=======
+- [06_task_week2_storage.md](06_task_week2_storage.md)
+- [07_adr_storage.md](07_adr_storage.md)
+- [next_steps.md](next_steps.md)
+
+## Current State Summary
+
+- Geographic remapping was upgraded from a uniform grid to an irregular Casablanca-aware zone design.
+- New remapping notebook was created, executed, validated, and cleaned from duplicate legacy cells.
+- Key quality outputs generated:
+  - data/zone_mapping.csv
+  - data/zone_centroids.csv
+  - data/remapped_trips_sample.csv
+  - notebooks/02_zone_remapping.ipynb
+  - notebooks/casablanca_zone_map.html
+
+## Stack Size
+
+13 containers total: Kafka, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter, Kafka Connect, connect-init.
+
+## Current Risk
+
+- Kafka Connect first startup requires internet (downloads S3 Sink plugin from Confluent Hub). Subsequent restarts use the cached plugin.
+- Producers must be running to generate data in `kafka-archive/`; an empty `raw.gps` topic produces no archived files.
+>>>>>>> c9685c6 ([task-6] Week 2: Kafka Connect S3 Sink archival, ADR-001, fix mldata bucket name)
