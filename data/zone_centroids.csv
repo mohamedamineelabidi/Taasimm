@@ -1,4 +1,4 @@
-﻿zone_id,arrondissement_name,casa_centroid_lat,casa_centroid_lon,casa_lat_min,casa_lat_max,casa_lon_min,casa_lon_max,adjacent_zones
+zone_id,arrondissement_name,casa_centroid_lat,casa_centroid_lon,casa_lat_min,casa_lat_max,casa_lon_min,casa_lon_max,adjacent_zones
 1,Ain Chock,33.4825,-7.6595,33.45,33.515,-7.72,-7.599,"2,4,5"
 2,Sidi Othmane,33.4825,-7.579,33.45,33.515,-7.599,-7.559,"1,3,5,6,7"
 3,Sidi Moumen,33.4825,-7.5195,33.45,33.515,-7.559,-7.48,"2,7"
