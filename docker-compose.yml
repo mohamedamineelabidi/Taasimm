@@ -198,11 +198,12 @@ services:
   # 4. FLINK — Stream processing (1 JM + 1 TM)
   # ──────────────────────────────────────────────
   flink-jobmanager:
-    image: flink:1.18-scala_2.12-java11
+    build: ./flink
     container_name: taasim-flink-jm
     hostname: flink-jobmanager
     ports:
       - "8081:8081"
+    entrypoint: /opt/flink/entrypoint-wrapper.sh
     command: jobmanager
     environment:
       FLINK_PROPERTIES: |
@@ -213,8 +214,12 @@ services:
         s3.path-style-access: true
         s3.access-key: minioadmin
         s3.secret-key: minioadmin
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.mode: EXACTLY_ONCE
     volumes:
       - ./jars/flink:/opt/flink/lib/extra
+      - ./flink/jobs:/opt/flink/jobs
+      - ./data:/opt/flink/data
     networks:
       - taasim-net
     healthcheck:
@@ -225,9 +230,10 @@ services:
       start_period: 20s
 
   flink-taskmanager:
-    image: flink:1.18-scala_2.12-java11
+    build: ./flink
     container_name: taasim-flink-tm
     hostname: flink-taskmanager
+    entrypoint: /opt/flink/entrypoint-wrapper.sh
     command: taskmanager
     environment:
       FLINK_PROPERTIES: |
@@ -239,8 +245,12 @@ services:
         s3.path-style-access: true
         s3.access-key: minioadmin
         s3.secret-key: minioadmin
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.mode: EXACTLY_ONCE
     volumes:
       - ./jars/flink:/opt/flink/lib/extra
+      - ./flink/jobs:/opt/flink/jobs
+      - ./data:/opt/flink/data
     depends_on:
       flink-jobmanager:
         condition: service_healthy

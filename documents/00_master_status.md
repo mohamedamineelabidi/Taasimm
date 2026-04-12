@@ -7,7 +7,8 @@ Project: TaaSim (Transport as a Service) - Casablanca
 
 - Week 1 / Sprint 1: COMPLETED
 - Week 2 / Sprint 2: COMPLETED
-- Currently targeting: Week 3 (Flink Job 1: GPS normalizer)
+- Week 3 / Sprint 3: COMPLETED
+- Currently targeting: Week 4 (Flink Jobs 2 & 3)
 
 ## Task Board — Week 1
 
@@ -22,6 +23,13 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [x] Task 1: Kafka Connect S3 Sink (raw.gps + raw.trips → kafka-archive/)
 - [x] Task 2: Cassandra schema verified (3 tables, INSERT + SELECT tested)
 - [x] Task 3: ADR v1 written (documents/07_adr_v1.md)
+
+## Task Board — Week 3
+
+- [x] Task 1: Flink checkpointing configured (RocksDB + S3/MinIO, 60s interval, EXACTLY_ONCE)
+- [x] Task 2: Flink Job 1 — GPS Normalizer (PyFlink DataStream, validates, assigns zone, anonymizes to centroid)
+- [x] Task 3: Watermark test (late event test script, event-time watermarks with 3-min lateness)
+- [x] Task 4: Grafana vehicle map dashboard (Geomap + bar chart + table panels)
 
 ## Evidence Files
 
@@ -39,3 +47,6 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - Kafka Connect S3 Sink archiving raw.gps and raw.trips to MinIO kafka-archive/ bucket
 - Cassandra schema deployed with 3 tables (vehicle_positions, trips, demand_zones)
 - GPS and trip producers tested end-to-end through Kafka → S3 Sink → MinIO
+- Flink Job 1 (GPS Normalizer) running on cluster: raw.gps → validate → zone assign → centroid snap → Cassandra + processed.gps
+- Flink checkpointing to MinIO (s3://curated/flink-checkpoints/) verified — 10+ checkpoints completed
+- Grafana vehicle tracking dashboard deployed with Geomap, zone bar chart, and event table

@@ -4,13 +4,9 @@ Last updated: 2026-04-12
 
 ## Immediate Next Steps
 
-1. Begin Week 3: Flink Job 1 — GPS Normalizer
-   - Read from `raw.gps` topic
-   - Validate coordinates, deduplicate, apply event-time watermarks (3-min lateness)
-   - Map GPS to zone, snap to centroid
-   - Write to Cassandra `vehicle_positions` + Kafka `processed.gps`
-2. Set up Grafana vehicle map panel (live updating from Cassandra)
-3. Continue with Flink Jobs 2 and 3 in Week 4
+1. Begin Week 4: Flink Job 2 — Demand Aggregator (30s tumbling windows per zone)
+2. Flink Job 3 — Trip Matcher (nearest vehicle + adjacent zone fallback)
+3. Grafana demand heatmap panel
 
 ## Pending Verifications
 
@@ -19,6 +15,13 @@ Last updated: 2026-04-12
 
 ## Update Log
 
+- 2026-04-12: Week 3 Sprint 3 completed — all 4 deliverables done.
+- 2026-04-12: Custom Flink Docker image built (PyFlink 1.18.1 + cassandra-driver + kafka-python).
+- 2026-04-12: Flink Job 1 GPS Normalizer deployed and running (2/2 tasks, job f1100660).
+- 2026-04-12: Centroid anonymization verified — raw GPS snapped to zone centroids in Cassandra.
+- 2026-04-12: Flink checkpointing to MinIO verified — 10+ checkpoints in s3://curated/flink-checkpoints/.
+- 2026-04-12: Late event watermark test created (scripts/test_late_events.py).
+- 2026-04-12: Grafana vehicle tracking dashboard deployed (Geomap + zone bar chart + table).
 - 2026-04-12: Week 2 Sprint 2 completed — all 3 deliverables done.
 - 2026-04-12: Kafka Connect S3 Sink deployed and verified (raw.gps + raw.trips → kafka-archive/).
 - 2026-04-12: Cassandra schema INSERT + SELECT tested on all 3 tables.

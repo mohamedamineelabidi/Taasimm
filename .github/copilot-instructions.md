@@ -173,6 +173,7 @@ Taasimm/
 │   ├── cassandra-init.cql             ← Cassandra schema
 │   ├── connect-s3-sink-gps.json       ← S3 Sink config for raw.gps
 │   ├── connect-s3-sink-trips.json     ← S3 Sink config for raw.trips
+│   ├── grafana-dashboard.json         ← Vehicle tracking dashboard
 │   └── spark-defaults.conf            ← Spark S3A config
 ├── data/
 │   ├── zone_mapping.csv               ← 16 Casablanca zones + adjacency
@@ -191,9 +192,16 @@ Taasimm/
 ├── jars/                              ← downloaded JARs (gitignored)
 │   ├── flink/                         ← flink-s3, kafka connector, cassandra connector
 │   └── spark/                         ← hadoop-aws, aws-sdk-bundle
+├── flink/
+│   ├── Dockerfile                     ← Custom Flink image (PyFlink + drivers)
+│   ├── entrypoint-wrapper.sh          ← JAR auto-loader at startup
+│   └── jobs/
+│       ├── gps_normalizer.py          ← Flink Job 1: GPS normalizer
+│       └── zone_data.py               ← Zone mapping helper (load, assign, validate)
 ├── scripts/
 │   ├── register-connectors.ps1        ← registers S3 Sink connectors via REST
-│   └── verify-cassandra.ps1           ← Cassandra schema test (INSERT + SELECT)
+│   ├── verify-cassandra.ps1           ← Cassandra schema test (INSERT + SELECT)
+│   └── test_late_events.py            ← Watermark late event test
 ├── documents/                         ← task status documentation
 │   ├── 00_master_status.md            ← master index
 │   ├── 01–05_task_*.md                ← per-task evidence
@@ -216,7 +224,7 @@ Taasimm/
 |------|-------|--------|
 | **1** | Docker stack, datasets, EDA, zone remapping, Kafka producers | **DONE** |
 | **2** | Storage design: Kafka Connect S3 Sink, Cassandra schema ADR | **DONE** |
-| **3** | Flink Job 1: GPS normalizer + watermarks + Grafana vehicle map | Upcoming |
+| **3** | Flink Job 1: GPS normalizer + watermarks + Grafana vehicle map | **DONE** |
 | **4** | Flink Job 2 (demand agg) + Job 3 (trip matcher) + adjacent zone fallback | Upcoming |
 | **5** | Spark ETL: Porto + NYC batch processing, KPI computation | Upcoming |
 | **6** | ML: feature engineering, GBT training, FastAPI forecast endpoint | Upcoming |
@@ -234,6 +242,12 @@ Taasimm/
 - [x] Task 1: Kafka Connect S3 Sink deployed (raw.gps + raw.trips → kafka-archive/)
 - [x] Task 2: Cassandra schema verified (3 tables, INSERT + SELECT tested)
 - [x] Task 3: ADR v1 written (Kappa, partition keys, MinIO zones, retention)
+
+### Week 3 Completed Tasks
+- [x] Task 1: Flink checkpointing (RocksDB + S3/MinIO, 60s interval, EXACTLY_ONCE)
+- [x] Task 2: GPS Normalizer job (PyFlink DataStream, zone assignment, centroid anonymization)
+- [x] Task 3: Watermark test (late event test script, 3-min bounded out-of-orderness)
+- [x] Task 4: Grafana vehicle map dashboard (Geomap + zone bar chart + event table)
 
 ### Performance Targets (SLAs)
 | Metric | Target |
