@@ -14,9 +14,9 @@ KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
 TOPIC_GPS = "raw.gps"
 TOPIC_TRIPS = "raw.trips"
 
-# ── Porto bounding box (transform range — v3, shifted to center density) ──
-PORTO_LAT_MIN, PORTO_LAT_MAX = 41.085, 41.195
-PORTO_LON_MIN, PORTO_LON_MAX = -8.690, -8.560
+# ── Porto bounding box (transform range — v5, tightened to P5–P90) ────────
+PORTO_LAT_MIN, PORTO_LAT_MAX = 41.135, 41.174
+PORTO_LON_MIN, PORTO_LON_MAX = -8.650, -8.585
 
 PORTO_METRO_LAT = (41.10, 41.25)
 PORTO_METRO_LON = (-8.72, -8.55)
