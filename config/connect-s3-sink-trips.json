@@ -1,0 +1,28 @@
+{
+  "name": "s3-sink-raw-trips",
+  "config": {
+    "connector.class": "io.confluent.connect.s3.S3SinkConnector",
+    "tasks.max": "1",
+    "topics": "raw.trips",
+    "s3.bucket.name": "kafka-archive",
+    "s3.region": "us-east-1",
+    "store.url": "http://minio:9000",
+    "s3.path.style.access.enabled": "true",
+    "aws.access.key.id": "minioadmin",
+    "aws.secret.access.key": "minioadmin",
+    "topics.dir": "",
+    "flush.size": "50",
+    "rotate.interval.ms": "60000",
+    "storage.class": "io.confluent.connect.s3.storage.S3Storage",
+    "format.class": "io.confluent.connect.s3.format.json.JsonFormat",
+    "partitioner.class": "io.confluent.connect.storage.partitioner.TimeBasedPartitioner",
+    "partition.duration.ms": "3600000",
+    "path.format": "'year'=YYYY/'month'=MM/'day'=dd/'hour'=HH",
+    "locale": "en-US",
+    "timezone": "Africa/Casablanca",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "schema.compatibility": "NONE"
+  }
+}

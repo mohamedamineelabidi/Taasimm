@@ -2,7 +2,7 @@
 
 > **Role**: Senior Data Engineer & Software Engineer building TaaSim (Transport as a Service), an urban mobility simulation platform for Casablanca, Morocco.
 > **Course**: Advanced Big Data Capstone — ENSAH, 2025–2026.
-> **Duration**: 8 weeks. Week 1 complete. Currently targeting Week 2+.
+> **Duration**: 8 weeks. Weeks 1–2 complete. Currently targeting Week 3+.
 
 ---
 
@@ -13,6 +13,7 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Event bus | Kafka 3.7.0 (KRaft, 1 broker) | Streams GPS + trip events, 7-day retention, 4 partitions default |
+| Event archival | Kafka Connect (cp-kafka-connect:7.6.0) | S3 Sink: mirrors `raw.gps` + `raw.trips` → MinIO `kafka-archive/` |
 | Object store | MinIO (S3-compatible) | Data lake: `raw/`, `curated/`, `ml/`, `kafka-archive/` |
 | Stream processing | Flink 1.18 (1 JM + 1 TM, 4 slots) | 3 jobs: GPS normalizer, demand aggregator, trip matcher |
 | Batch + ML | Spark 3.5.4 (PySpark) | ETL on Porto/NYC data, GBT demand forecasting (MLlib) |
@@ -22,10 +23,13 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Notebooks | Jupyter (pyspark-notebook) | EDA and zone remapping analysis |
 
 ### Source-of-Truth Files
-- `docker-compose.yml` — all 11 container definitions (Kafka, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter)
+- `docker-compose.yml` — all 12 container definitions (Kafka, Kafka Connect, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter)
 - `config/cassandra-init.cql` — keyspace `taasim` + 3 tables with partition key justification
+- `config/connect-s3-sink-gps.json` — S3 Sink connector config for `raw.gps` topic
+- `config/connect-s3-sink-trips.json` — S3 Sink connector config for `raw.trips` topic
 - `config/spark-defaults.conf` — S3A endpoint, hadoop-aws/aws-sdk JARs, Kryo serializer
 - `producers/config.py` — shared constants, bounding-box transform, zone loader
+- `documents/07_adr_v1.md` — Architecture Decision Record (Kappa, Cassandra keys, MinIO, retention)
 
 ### Kafka Topics
 | Topic | Producer | Consumer |
@@ -82,6 +86,7 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Flink Web UI | `localhost:8081` | — |
 | Spark Master UI | `localhost:8080` | — |
 | Spark App UI | `localhost:4040` | — |
+| Kafka Connect REST | `localhost:8083` | — |
 | Grafana | `localhost:3000` | admin / admin |
 | Jupyter Lab | `localhost:8888` | token from logs |
 
@@ -92,6 +97,12 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 
 # Trip request producer (5 trips)
 .venv/Scripts/python.exe producers/trip_request_producer.py --max-trips 5
+
+# Register Kafka Connect S3 Sink connectors
+.\scripts\register-connectors.ps1
+
+# Verify S3 Sink archival
+docker exec taasim-minio mc ls local/kafka-archive/ --recursive
 ```
 
 ### Health Verification Commands
@@ -111,6 +122,9 @@ docker exec taasim-flink-jm curl -s http://localhost:8081/overview
 
 # Spark
 docker exec taasim-spark-master curl -s http://localhost:8080/json/
+
+# Kafka Connect
+curl http://localhost:8083/connectors
 
 # Grafana
 docker exec taasim-grafana curl -s http://localhost:3000/api/health
@@ -157,6 +171,8 @@ Taasimm/
 ├── upload-datasets.ps1                ← dataset upload to MinIO
 ├── config/
 │   ├── cassandra-init.cql             ← Cassandra schema
+│   ├── connect-s3-sink-gps.json       ← S3 Sink config for raw.gps
+│   ├── connect-s3-sink-trips.json     ← S3 Sink config for raw.trips
 │   └── spark-defaults.conf            ← Spark S3A config
 ├── data/
 │   ├── zone_mapping.csv               ← 16 Casablanca zones + adjacency
@@ -175,11 +191,14 @@ Taasimm/
 ├── jars/                              ← downloaded JARs (gitignored)
 │   ├── flink/                         ← flink-s3, kafka connector, cassandra connector
 │   └── spark/                         ← hadoop-aws, aws-sdk-bundle
-├── scripts/                           ← utility scripts
+├── scripts/
+│   ├── register-connectors.ps1        ← registers S3 Sink connectors via REST
+│   └── verify-cassandra.ps1           ← Cassandra schema test (INSERT + SELECT)
 ├── documents/                         ← task status documentation
 │   ├── 00_master_status.md            ← master index
 │   ├── 01–05_task_*.md                ← per-task evidence
-│   └── 06_next_steps.md               ← roadmap + update log
+│   ├── 06_next_steps.md               ← roadmap + update log
+│   └── 07_adr_v1.md                   ← Architecture Decision Record
 ├── Taasim_project_description_all.md  ← full project specification
 └── Sprint1.md                         ← Week 1 task descriptions
 ```
@@ -196,7 +215,7 @@ Taasimm/
 | Week | Focus | Status |
 |------|-------|--------|
 | **1** | Docker stack, datasets, EDA, zone remapping, Kafka producers | **DONE** |
-| **2** | Storage design: Kafka Connect S3 Sink, Cassandra schema ADR | Next |
+| **2** | Storage design: Kafka Connect S3 Sink, Cassandra schema ADR | **DONE** |
 | **3** | Flink Job 1: GPS normalizer + watermarks + Grafana vehicle map | Upcoming |
 | **4** | Flink Job 2 (demand agg) + Job 3 (trip matcher) + adjacent zone fallback | Upcoming |
 | **5** | Spark ETL: Porto + NYC batch processing, KPI computation | Upcoming |
@@ -205,11 +224,16 @@ Taasimm/
 | **8** | Demo: Grafana polish, event injector, pitch deck, technical report | Upcoming |
 
 ### Week 1 Completed Tasks
-- [x] Task 1: Docker Compose stack (11 containers, all healthy)
+- [x] Task 1: Docker Compose stack (12 containers, all healthy)
 - [x] Task 2: Datasets uploaded to MinIO (Porto 1.8 GiB + NYC 150 MiB)
 - [x] Task 3: Porto EDA notebook (schema, durations, call types, demand curves)
-- [x] Task 4: Zone remapping v3 (irregular geographic tessellation, 99.6% coverage)
+- [x] Task 4: Zone remapping v5 (irregular geographic tessellation, Gini 0.275)
 - [x] Task 5: Kafka producers (GPS + trip request simulators)
+
+### Week 2 Completed Tasks
+- [x] Task 1: Kafka Connect S3 Sink deployed (raw.gps + raw.trips → kafka-archive/)
+- [x] Task 2: Cassandra schema verified (3 tables, INSERT + SELECT tested)
+- [x] Task 3: ADR v1 written (Kappa, partition keys, MinIO zones, retention)
 
 ### Performance Targets (SLAs)
 | Metric | Target |
@@ -321,6 +345,8 @@ Taasimm/
 | Spark can't read MinIO | Check `spark-defaults.conf` has correct S3A endpoint. Verify JARs in `jars/spark/`. |
 | Push fails / times out | Check `.gitignore` — large data files must NOT be tracked in git |
 | Kafka listener confusion | Host connects via `localhost:9092` (mapped from container port 29092). Containers use `kafka:9092` (PLAINTEXT). |
+| Kafka Connect S3 creds | S3 Sink needs `aws.access.key.id` + `aws.secret.access.key` in connector config for MinIO. |
+| S3 Sink not flushing | Check `flush.size` (record count) and `rotate.interval.ms` (time). Files appear after threshold is met. |
 | Grafana empty panels | Verify Cassandra datasource plugin is installed: `hadesarchitect-cassandra-datasource` |
 | Producer GPS noise | Intentional: ±20m drift + 5% blackout. This is by design for Flink watermark testing. |
 
