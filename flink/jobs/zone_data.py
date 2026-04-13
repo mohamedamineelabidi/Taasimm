@@ -23,6 +23,7 @@ def load_zones(csv_path=None):
                 "lon_max": float(row["casa_lon_max"]),
                 "centroid_lat": float(row["casa_centroid_lat"]),
                 "centroid_lon": float(row["casa_centroid_lon"]),
+                "adjacent_zones": row.get("adjacent_zones", ""),
             })
     return zones
 
