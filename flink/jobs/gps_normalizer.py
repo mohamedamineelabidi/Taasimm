@@ -21,7 +21,7 @@ from pyflink.datastream.connectors.kafka import (
 )
 from pyflink.datastream.functions import MapFunction, FilterFunction, RuntimeContext
 
-from zone_data import load_zones, assign_zone, is_valid_gps
+# zone_data functions inlined to avoid module resolution issues in PyFlink Beam workers
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("GPSNormalizer")
@@ -56,7 +56,26 @@ class GpsProcessor(MapFunction):
     """Validate, assign zone, anonymize coordinates, prepare for sinks."""
 
     def open(self, runtime_context: RuntimeContext):
-        self.zones = load_zones()
+        import csv
+        CASA_LAT_MIN, CASA_LAT_MAX = 33.450, 33.680
+        CASA_LON_MIN, CASA_LON_MAX = -7.720, -7.480
+        self._bounds = (CASA_LAT_MIN, CASA_LAT_MAX, CASA_LON_MIN, CASA_LON_MAX)
+        self.zones = []
+        try:
+            with open("/opt/flink/data/zone_mapping.csv", "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    self.zones.append({
+                        "zone_id": int(row["zone_id"]),
+                        "lat_min": float(row["casa_lat_min"]),
+                        "lat_max": float(row["casa_lat_max"]),
+                        "lon_min": float(row["casa_lon_min"]),
+                        "lon_max": float(row["casa_lon_max"]),
+                        "centroid_lat": float(row["casa_centroid_lat"]),
+                        "centroid_lon": float(row["casa_centroid_lon"]),
+                    })
+        except Exception as e:
+            logger.error(f"Zone CSV load failed: {e}")
         logger.info(f"Loaded {len(self.zones)} zones")
 
         # Initialize Cassandra connection
@@ -90,16 +109,21 @@ class GpsProcessor(MapFunction):
         if lat is None or lon is None or timestamp is None:
             return None
 
-        # Validate coordinates and speed
-        if not is_valid_gps(lat, lon, speed):
+        # Validate coordinates and speed (inlined is_valid_gps)
+        b = self._bounds
+        if not (b[0] <= lat <= b[1] and b[2] <= lon <= b[3]):
+            return None
+        if speed is not None and speed > 150.0:
             return None
 
-        # Assign zone
-        zone_result = assign_zone(lat, lon, self.zones)
-        if zone_result is None:
+        # Assign zone (inlined assign_zone)
+        zone_id = centroid_lat = centroid_lon = None
+        for z in self.zones:
+            if z["lat_min"] <= lat <= z["lat_max"] and z["lon_min"] <= lon <= z["lon_max"]:
+                zone_id, centroid_lat, centroid_lon = z["zone_id"], z["centroid_lat"], z["centroid_lon"]
+                break
+        if zone_id is None:
             return None
-
-        zone_id, centroid_lat, centroid_lon = zone_result
 
         # Convert timestamp to datetime for Cassandra
         event_time = datetime.utcfromtimestamp(int(timestamp))
