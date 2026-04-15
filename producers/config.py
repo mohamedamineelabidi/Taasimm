@@ -1,13 +1,15 @@
 """
 TaaSim Kafka Producer Configuration
 ====================================
-Shared constants, bounding-box transform, and zone mapping loader
-used by both vehicle_gps_producer.py and trip_request_producer.py.
+Shared constants, bounding-box transform, zone mapping loader,
+and H3 hexagonal zone assignment used by both producers.
 """
 
 import csv
+import json
 import os
 import numpy as np
+import h3
 
 # ── Kafka ────────────────────────────────────────────────────────────
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
@@ -37,6 +39,8 @@ REPLAY_SPEED = 10            # 10x real-time
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 ZONE_MAPPING_PATH = os.path.join(DATA_DIR, "zone_mapping.csv")
 PORTO_CSV_PATH = os.path.join(DATA_DIR, "train.csv")
+H3_LOOKUP_PATH = os.path.join(DATA_DIR, "h3_zone_lookup.json")
+H3_RESOLUTION = 9
 
 
 def transform_coord(val, src_min, src_max, dst_min, dst_max):
@@ -89,3 +93,31 @@ def assign_zone(lat, lon, zones):
                 z["lon_min"] <= lon <= z["lon_max"]):
             return z["zone_id"], z["name"]
     return 0, "Outside"
+
+
+# ── H3 Hexagonal Zone Assignment ────────────────────────────────────
+
+def load_h3_lookup(path=None):
+    """Load h3_zone_lookup.json → dict {h3_index: {"zone_id": int, "name": str}}."""
+    p = path or H3_LOOKUP_PATH
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def assign_h3_zone(lat, lon, h3_lookup, resolution=H3_RESOLUTION, max_rings=5):
+    """O(1) H3 zone lookup with grid_ring fallback.
+
+    Returns (zone_id, zone_name, h3_index).
+    Falls back to expanding rings if the exact cell isn't in the lookup.
+    Returns (0, "Outside", h3_index) if no zone found within max_rings.
+    """
+    h3_cell = h3.latlng_to_cell(lat, lon, resolution)
+    if h3_cell in h3_lookup:
+        info = h3_lookup[h3_cell]
+        return info["zone_id"], info["name"], h3_cell
+    for k in range(1, max_rings + 1):
+        for nb in h3.grid_ring(h3_cell, k):
+            if nb in h3_lookup:
+                info = h3_lookup[nb]
+                return info["zone_id"], info["name"], h3_cell
+    return 0, "Outside", h3_cell
