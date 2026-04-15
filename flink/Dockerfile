@@ -11,7 +11,8 @@ RUN apt-get update && \
 RUN pip3 install --no-cache-dir \
     apache-flink==1.18.1 \
     cassandra-driver==3.29.2 \
-    kafka-python==2.0.2
+    kafka-python==2.0.2 \
+    h3==4.4.2
 
 # Copy extra JARs into Flink's lib so they auto-load
 # (mounted at /opt/flink/lib/extra via docker-compose volume)
