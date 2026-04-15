@@ -211,16 +211,19 @@ class TripMatcherFunction(KeyedProcessFunction):
                 })
 
     def _find_best_vehicle(self, zone_id, trip_event):
-        """Return (taxi_id, eta_seconds, fare) for best vehicle or None."""
+        """Return (taxi_id, eta_seconds, fare) for nearest vehicle or None."""
         best_taxi = None
         best_dist = float("inf")
+
+        o_lat = trip_event.get("origin_lat", 0)
+        o_lon = trip_event.get("origin_lon", 0)
 
         try:
             for taxi_id, data_str in self._vehicles.items():
                 data = json.loads(data_str)
-                # Use tie-breaking via hash when positions are nearly identical
-                unique_penalty = (hash(taxi_id) % 1000) * 0.001
-                dist = unique_penalty  # vehicles are already in-zone; use tie-breaking
+                v_lat = data.get("lat", 0)
+                v_lon = data.get("lon", 0)
+                dist = haversine_km(o_lat, o_lon, v_lat, v_lon)
                 if dist < best_dist:
                     best_dist = dist
                     best_taxi = taxi_id
@@ -231,11 +234,13 @@ class TripMatcherFunction(KeyedProcessFunction):
         if best_taxi is None:
             return None
 
-        # ETA: assume ~0.5 km to rider within zone at AVG_SPEED_KMH
-        eta_seconds = max(60, int(0.5 / AVG_SPEED_KMH * 3600))
-        # Fare = base 10 MAD + 3 MAD/km estimated trip distance
-        est_trip_km = 5.0
-        fare = round(10.0 + 3.0 * est_trip_km, 2)
+        # ETA based on pickup distance
+        eta_seconds = max(60, int(best_dist / AVG_SPEED_KMH * 3600))
+        # Fare: base 10 MAD + 3 MAD/km for estimated trip distance
+        d_lat = trip_event.get("dest_lat", o_lat)
+        d_lon = trip_event.get("dest_lon", o_lon)
+        trip_km = max(1.0, haversine_km(o_lat, o_lon, d_lat, d_lon))
+        fare = round(10.0 + 3.0 * trip_km, 2)
         return best_taxi, eta_seconds, fare
 
     def _write_match(self, event, taxi_id, zone_id, eta_seconds, fare):

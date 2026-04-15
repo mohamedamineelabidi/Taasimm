@@ -57,26 +57,34 @@ class GpsProcessor(MapFunction):
 
     def open(self, runtime_context: RuntimeContext):
         import csv
+        import h3 as _h3
+        self._h3 = _h3
         CASA_LAT_MIN, CASA_LAT_MAX = 33.450, 33.680
         CASA_LON_MIN, CASA_LON_MAX = -7.720, -7.480
         self._bounds = (CASA_LAT_MIN, CASA_LAT_MAX, CASA_LON_MIN, CASA_LON_MAX)
-        self.zones = []
+
+        # Load H3→zone lookup for O(1) zone assignment
+        self.h3_lookup = {}
+        try:
+            with open("/opt/flink/data/h3_zone_lookup.json", "r") as f:
+                self.h3_lookup = json.load(f)
+        except Exception as e:
+            logger.error(f"H3 lookup load failed: {e}")
+
+        # Load zone centroids for anonymization
+        self.zone_centroids = {}
         try:
             with open("/opt/flink/data/zone_mapping.csv", "r") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    self.zones.append({
-                        "zone_id": int(row["zone_id"]),
-                        "lat_min": float(row["casa_lat_min"]),
-                        "lat_max": float(row["casa_lat_max"]),
-                        "lon_min": float(row["casa_lon_min"]),
-                        "lon_max": float(row["casa_lon_max"]),
-                        "centroid_lat": float(row["casa_centroid_lat"]),
-                        "centroid_lon": float(row["casa_centroid_lon"]),
-                    })
+                    zid = int(row["zone_id"])
+                    self.zone_centroids[zid] = (
+                        float(row["casa_centroid_lat"]),
+                        float(row["casa_centroid_lon"]),
+                    )
         except Exception as e:
-            logger.error(f"Zone CSV load failed: {e}")
-        logger.info(f"Loaded {len(self.zones)} zones")
+            logger.error(f"Zone centroid load failed: {e}")
+        logger.info(f"Loaded {len(self.h3_lookup)} H3 cells, {len(self.zone_centroids)} zone centroids")
 
         # Initialize Cassandra connection
         from cassandra.cluster import Cluster
@@ -84,8 +92,8 @@ class GpsProcessor(MapFunction):
         self.session = self.cluster.connect(CASSANDRA_KEYSPACE)
         self.insert_stmt = self.session.prepare(
             f"INSERT INTO {CASSANDRA_TABLE} "
-            "(city, zone_id, event_time, taxi_id, lat, lon, speed, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            "(city, zone_id, event_time, taxi_id, lat, lon, speed, status, h3_index) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         logger.info("Connected to Cassandra")
 
@@ -116,14 +124,27 @@ class GpsProcessor(MapFunction):
         if speed is not None and speed > 150.0:
             return None
 
-        # Assign zone (inlined assign_zone)
-        zone_id = centroid_lat = centroid_lon = None
-        for z in self.zones:
-            if z["lat_min"] <= lat <= z["lat_max"] and z["lon_min"] <= lon <= z["lon_max"]:
-                zone_id, centroid_lat, centroid_lon = z["zone_id"], z["centroid_lat"], z["centroid_lon"]
-                break
+        # Assign zone via H3 O(1) lookup (replaces bbox loop)
+        cell = self._h3.latlng_to_cell(lat, lon, 9)
+        zone_id = None
+        if cell in self.h3_lookup:
+            zone_id = self.h3_lookup[cell]["zone_id"]
+        else:
+            for ring in range(1, 6):
+                for neighbor in self._h3.grid_ring(cell, ring):
+                    if neighbor in self.h3_lookup:
+                        zone_id = self.h3_lookup[neighbor]["zone_id"]
+                        break
+                if zone_id is not None:
+                    break
         if zone_id is None:
             return None
+
+        # Anonymize: snap to zone centroid
+        centroid = self.zone_centroids.get(zone_id)
+        if centroid is None:
+            return None
+        centroid_lat, centroid_lon = centroid
 
         # Convert timestamp to datetime for Cassandra
         event_time = datetime.utcfromtimestamp(int(timestamp))
@@ -133,7 +154,7 @@ class GpsProcessor(MapFunction):
             self.session.execute(
                 self.insert_stmt,
                 ("casablanca", zone_id, event_time, taxi_id,
-                 centroid_lat, centroid_lon, speed, status)
+                 centroid_lat, centroid_lon, speed, status, cell)
             )
         except Exception as e:
             logger.error(f"Cassandra write error: {e}")
@@ -142,6 +163,7 @@ class GpsProcessor(MapFunction):
         output = {
             "taxi_id": taxi_id,
             "zone_id": zone_id,
+            "h3_index": cell,
             "event_time": event_time.isoformat() + "Z",
             "lat": centroid_lat,
             "lon": centroid_lon,
