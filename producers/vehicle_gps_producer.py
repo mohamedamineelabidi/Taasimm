@@ -37,6 +37,7 @@ from config import (
     transform_to_casablanca,
     load_h3_lookup,
     assign_h3_zone,
+    snap_to_road,
 )
 
 logging.basicConfig(
@@ -130,6 +131,7 @@ def run(max_trips, speed):
                     continue
 
                 casa_lat, casa_lon = transform_to_casablanca(lat, lon)
+                casa_lat, casa_lon = snap_to_road(casa_lat, casa_lon)
                 zone_id, zone_name, h3_cell = assign_h3_zone(
                     casa_lat, casa_lon, h3_lookup)
                 if zone_id == 0:

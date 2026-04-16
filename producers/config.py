@@ -121,3 +121,34 @@ def assign_h3_zone(lat, lon, h3_lookup, resolution=H3_RESOLUTION, max_rings=5):
                 info = h3_lookup[nb]
                 return info["zone_id"], info["name"], h3_cell
     return 0, "Outside", h3_cell
+
+
+# ── Road Snapping ────────────────────────────────────────────────────
+
+ROAD_NODES_PATH = os.path.join(DATA_DIR, "casablanca_road_nodes.npy")
+
+_road_tree = None
+_road_arr = None
+
+
+def load_road_tree():
+    """Load KDTree of Casablanca road nodes for snap_to_road(). Cached after first call."""
+    global _road_tree, _road_arr
+    if _road_tree is None:
+        from scipy.spatial import cKDTree
+        _road_arr = np.load(ROAD_NODES_PATH)
+        _road_tree = cKDTree(_road_arr)
+    return _road_tree, _road_arr
+
+
+def snap_to_road(lat, lon, max_dist_deg=0.005):
+    """Snap a GPS coordinate to the nearest road node.
+
+    Returns (snapped_lat, snapped_lon). If the nearest road node is
+    farther than max_dist_deg (~550m), returns the original point unchanged.
+    """
+    tree, arr = load_road_tree()
+    dist, idx = tree.query([lat, lon])
+    if dist <= max_dist_deg:
+        return float(arr[idx][0]), float(arr[idx][1])
+    return lat, lon
