@@ -131,7 +131,11 @@ def run(max_trips, speed):
                     continue
 
                 casa_lat, casa_lon = transform_to_casablanca(lat, lon)
-                casa_lat, casa_lon = snap_to_road(casa_lat, casa_lon)
+                casa_lat, casa_lon, snap_dist_m, snapped_valid = snap_to_road(
+                    casa_lat, casa_lon, h3_lookup=h3_lookup
+                )
+                if not snapped_valid:
+                    continue
                 zone_id, zone_name, h3_cell = assign_h3_zone(
                     casa_lat, casa_lon, h3_lookup)
                 if zone_id == 0:
@@ -166,6 +170,8 @@ def run(max_trips, speed):
                     "h3_index": h3_cell,
                     "zone_id": zone_id,
                     "zone_name": zone_name,
+                    "snap_dist_m": round(snap_dist_m, 2),
+                    "snapped_valid": True,
                 }
 
                 # Simulate GPS blackout: delay sending (creates out-of-order)

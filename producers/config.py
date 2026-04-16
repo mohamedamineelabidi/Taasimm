@@ -129,6 +129,7 @@ ROAD_NODES_PATH = os.path.join(DATA_DIR, "casablanca_road_nodes.npy")
 
 _road_tree = None
 _road_arr = None
+_h3_lookup_cache = None
 
 
 def load_road_tree():
@@ -141,14 +142,31 @@ def load_road_tree():
     return _road_tree, _road_arr
 
 
-def snap_to_road(lat, lon, max_dist_deg=0.005):
-    """Snap a GPS coordinate to the nearest road node.
+def _get_h3_lookup_cached():
+    """Load h3 lookup once for strict land validation during snapping."""
+    global _h3_lookup_cache
+    if _h3_lookup_cache is None:
+        _h3_lookup_cache = load_h3_lookup()
+    return _h3_lookup_cache
 
-    Returns (snapped_lat, snapped_lon). If the nearest road node is
-    farther than max_dist_deg (~550m), returns the original point unchanged.
+
+def snap_to_road(lat, lon, h3_lookup=None, max_dist_deg=0.003):
+    """Strict snap to nearest road node with distance + land validation.
+
+    Returns (snapped_lat, snapped_lon, snap_dist_m, snapped_valid).
+    - max_dist_deg=0.003 (~333m), aligned with notebook strict filtering.
+    - snapped_valid=False when point is too far from roads or outside land zones.
     """
     tree, arr = load_road_tree()
     dist, idx = tree.query([lat, lon])
-    if dist <= max_dist_deg:
-        return float(arr[idx][0]), float(arr[idx][1])
-    return lat, lon
+    snap_dist_m = float(dist * 111_000)
+    if dist > max_dist_deg:
+        return None, None, snap_dist_m, False
+
+    snapped_lat, snapped_lon = float(arr[idx][0]), float(arr[idx][1])
+    lookup = h3_lookup if h3_lookup is not None else _get_h3_lookup_cached()
+    zone_id, _, _ = assign_h3_zone(snapped_lat, snapped_lon, lookup)
+    if zone_id == 0:
+        return None, None, snap_dist_m, False
+
+    return snapped_lat, snapped_lon, snap_dist_m, True

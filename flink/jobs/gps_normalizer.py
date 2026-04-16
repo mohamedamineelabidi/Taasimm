@@ -113,6 +113,8 @@ class GpsProcessor(MapFunction):
         taxi_id = data.get("taxi_id", "unknown")
         status = data.get("status", "unknown")
         timestamp = data.get("timestamp")
+        snapped_valid = data.get("snapped_valid", True)
+        snap_dist_m = data.get("snap_dist_m")
 
         if lat is None or lon is None or timestamp is None:
             return None
@@ -122,6 +124,11 @@ class GpsProcessor(MapFunction):
         if not (b[0] <= lat <= b[1] and b[2] <= lon <= b[3]):
             return None
         if speed is not None and speed > 150.0:
+            return None
+        # Strict runtime guard aligned with notebook filtering
+        if not snapped_valid:
+            return None
+        if snap_dist_m is not None and float(snap_dist_m) > 333.0:
             return None
 
         # Assign zone via H3 O(1) lookup (replaces bbox loop)
