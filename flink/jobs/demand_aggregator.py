@@ -19,7 +19,7 @@ Checkpointing: 60s interval, EXACTLY_ONCE, RocksDB to s3://curated/flink-checkpo
 import json
 import os
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
 from pyflink.datastream.functions import ProcessWindowFunction, RuntimeContext
@@ -32,7 +32,6 @@ from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.window import TumblingProcessingTimeWindows
 
 from cassandra.cluster import Cluster
-from cassandra.policies import DCAwareRoundRobinPolicy
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DemandAggregator")
@@ -57,9 +56,10 @@ class TripTimestampAssigner:
     def extract_timestamp(self, value, record_timestamp):
         try:
             event = json.loads(value)
-            requested_at = event.get("requested_at", "")
-            if requested_at:
-                dt = datetime.fromisoformat(requested_at.replace("Z", "+00:00"))
+            # event_time is ISO-8601 UTC string (canonical field, renamed from requested_at)
+            event_time = event.get("event_time", "")
+            if event_time:
+                dt = datetime.fromisoformat(event_time.replace("Z", "+00:00"))
                 return int(dt.timestamp() * 1000)
         except Exception:
             pass
@@ -77,13 +77,11 @@ class DemandWindowFunction(ProcessWindowFunction):
         self._insert_stmt = None
         self._kafka_producer = None
 
-    def open(self, runtime_context: RuntimeContext):
+    def _connect_cassandra(self):
+        """Establish (or re-establish) Cassandra connection. Uses default LBP so the
+        driver auto-detects the DC name — avoids hardcoding dc1 vs datacenter1."""
         try:
-            cluster = Cluster(
-                [CASSANDRA_HOST],
-                load_balancing_policy=DCAwareRoundRobinPolicy(local_dc="datacenter1"),
-                protocol_version=4,
-            )
+            cluster = Cluster([CASSANDRA_HOST], protocol_version=4)
             self._cassandra_session = cluster.connect("taasim")
             self._insert_stmt = self._cassandra_session.prepare(
                 """
@@ -96,10 +94,15 @@ class DemandWindowFunction(ProcessWindowFunction):
             logger.info("Cassandra connected in DemandWindowFunction")
         except Exception as e:
             logger.error(f"Cassandra connect failed: {e}")
+            self._cassandra_session = None
+
+    def open(self, runtime_context: RuntimeContext):
+        self._connect_cassandra()
 
     def process(self, key, context, elements):
         city, zone_id = key
-        gps_count = 0
+        # P6 fix: count distinct taxi_ids, not total GPS ping events
+        vehicle_ids = set()
         trip_count = 0
         window_start_ms = context.window().start
 
@@ -111,30 +114,41 @@ class DemandWindowFunction(ProcessWindowFunction):
                 if event.get("_type") == "trip":
                     trip_count += 1
                 else:
-                    gps_count += 1
+                    taxi_id = event.get("taxi_id")
+                    if taxi_id:
+                        vehicle_ids.add(taxi_id)
             except Exception:
                 pass
 
-        ratio = gps_count / max(1, trip_count)
+        unique_vehicles = len(vehicle_ids)
+        ratio = unique_vehicles / max(1, trip_count)
         window_start_dt = datetime.fromtimestamp(window_start_ms / 1000, tz=timezone.utc)
-        forecast_demand = float(trip_count)
+        # forecast_demand: placeholder until ML model deployed (Week 6)
+        forecast_demand = 0.0
 
-        # Write to Cassandra
+        if self._cassandra_session is None:
+            self._connect_cassandra()
         if self._cassandra_session:
             try:
                 self._cassandra_session.execute(
                     self._insert_stmt,
-                    (city, zone_id, window_start_dt, gps_count, trip_count, ratio, forecast_demand)
+                    (city, zone_id, window_start_dt, unique_vehicles, trip_count, ratio, forecast_demand)
                 )
             except Exception as e:
                 logger.error(f"Cassandra write failed: {e}")
+                self._cassandra_session = None  # force reconnect on next window
 
-        # Emit to Kafka processed.demand
+        # P3 note: TumblingProcessingTimeWindows (not event-time) is intentional.
+        # Porto GPS timestamps are 2013-era; trip timestamps are 2026 real-time.
+        # Aligning both streams by event-time is architecturally impossible without
+        # timestamp normalization. Processing-time windows give correct wall-clock
+        # 30s aggregation for the Grafana heatmap.
         output = json.dumps({
             "city": city,
             "zone_id": zone_id,
             "window_start": window_start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "active_vehicles": gps_count,
+            "window_end": (window_start_dt + timedelta(seconds=WINDOW_SECONDS)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "unique_vehicles": unique_vehicles,
             "pending_requests": trip_count,
             "ratio": round(ratio, 3),
         })

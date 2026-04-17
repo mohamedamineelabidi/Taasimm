@@ -160,16 +160,14 @@ def run(max_trips, base_rate):
                 "trip_id": trip_id,
                 "rider_id": rider_id,
                 "origin_zone": origin_zone["zone_id"],
-                "origin_zone_name": origin_zone["name"],
                 "origin_lat": round(o_lat, 6),
                 "origin_lon": round(o_lon, 6),
                 "origin_h3": origin_h3,
                 "destination_zone": dest_zone["zone_id"],
-                "destination_zone_name": dest_zone["name"],
                 "dest_lat": round(d_lat, 6),
                 "dest_lon": round(d_lon, 6),
                 "dest_h3": dest_h3,
-                "requested_at": now.isoformat(),
+                "event_time": now.isoformat(),
                 "call_type": pick_call_type(),
             }
 

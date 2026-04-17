@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS trips (
     taxi_id         TEXT,
     origin_zone     INT,
     dest_zone       INT,
+    origin_h3       TEXT,
+    dest_h3         TEXT,
     status          TEXT,
     fare            DOUBLE,
     eta_seconds     INT,

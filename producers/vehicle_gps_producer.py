@@ -136,7 +136,7 @@ def run(max_trips, speed):
                 )
                 if not snapped_valid:
                     continue
-                zone_id, zone_name, h3_cell = assign_h3_zone(
+                zone_id, _, h3_cell = assign_h3_zone(
                     casa_lat, casa_lon, h3_lookup)
                 if zone_id == 0:
                     continue  # skip points outside all zones (ocean/edge)
@@ -159,7 +159,6 @@ def run(max_trips, speed):
                 event = {
                     "taxi_id": taxi_id,
                     "trip_id": trip_id,
-                    "timestamp": event_ts,
                     "event_time": datetime.fromtimestamp(
                         event_ts, tz=timezone.utc
                     ).isoformat(),
@@ -169,9 +168,7 @@ def run(max_trips, speed):
                     "status": status,
                     "h3_index": h3_cell,
                     "zone_id": zone_id,
-                    "zone_name": zone_name,
                     "snap_dist_m": round(snap_dist_m, 2),
-                    "snapped_valid": True,
                 }
 
                 # Simulate GPS blackout: delay sending (creates out-of-order)
