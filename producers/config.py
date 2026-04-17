@@ -1,13 +1,15 @@
 """
 TaaSim Kafka Producer Configuration
 ====================================
-Shared constants, bounding-box transform, and zone mapping loader
-used by both vehicle_gps_producer.py and trip_request_producer.py.
+Shared constants, bounding-box transform, zone mapping loader,
+and H3 hexagonal zone assignment used by both producers.
 """
 
 import csv
+import json
 import os
 import numpy as np
+import h3
 
 # ── Kafka ────────────────────────────────────────────────────────────
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
@@ -37,6 +39,8 @@ REPLAY_SPEED = 10            # 10x real-time
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 ZONE_MAPPING_PATH = os.path.join(DATA_DIR, "zone_mapping.csv")
 PORTO_CSV_PATH = os.path.join(DATA_DIR, "train.csv")
+H3_LOOKUP_PATH = os.path.join(DATA_DIR, "h3_zone_lookup.json")
+H3_RESOLUTION = 9
 
 
 def transform_coord(val, src_min, src_max, dst_min, dst_max):
@@ -89,3 +93,80 @@ def assign_zone(lat, lon, zones):
                 z["lon_min"] <= lon <= z["lon_max"]):
             return z["zone_id"], z["name"]
     return 0, "Outside"
+
+
+# ── H3 Hexagonal Zone Assignment ────────────────────────────────────
+
+def load_h3_lookup(path=None):
+    """Load h3_zone_lookup.json → dict {h3_index: {"zone_id": int, "name": str}}."""
+    p = path or H3_LOOKUP_PATH
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def assign_h3_zone(lat, lon, h3_lookup, resolution=H3_RESOLUTION, max_rings=5):
+    """O(1) H3 zone lookup with grid_ring fallback.
+
+    Returns (zone_id, zone_name, h3_index).
+    Falls back to expanding rings if the exact cell isn't in the lookup.
+    Returns (0, "Outside", h3_index) if no zone found within max_rings.
+    """
+    h3_cell = h3.latlng_to_cell(lat, lon, resolution)
+    if h3_cell in h3_lookup:
+        info = h3_lookup[h3_cell]
+        return info["zone_id"], info["name"], h3_cell
+    for k in range(1, max_rings + 1):
+        for nb in h3.grid_ring(h3_cell, k):
+            if nb in h3_lookup:
+                info = h3_lookup[nb]
+                return info["zone_id"], info["name"], h3_cell
+    return 0, "Outside", h3_cell
+
+
+# ── Road Snapping ────────────────────────────────────────────────────
+
+ROAD_NODES_PATH = os.path.join(DATA_DIR, "casablanca_road_nodes.npy")
+
+_road_tree = None
+_road_arr = None
+_h3_lookup_cache = None
+
+
+def load_road_tree():
+    """Load KDTree of Casablanca road nodes for snap_to_road(). Cached after first call."""
+    global _road_tree, _road_arr
+    if _road_tree is None:
+        from scipy.spatial import cKDTree
+        _road_arr = np.load(ROAD_NODES_PATH)
+        _road_tree = cKDTree(_road_arr)
+    return _road_tree, _road_arr
+
+
+def _get_h3_lookup_cached():
+    """Load h3 lookup once for strict land validation during snapping."""
+    global _h3_lookup_cache
+    if _h3_lookup_cache is None:
+        _h3_lookup_cache = load_h3_lookup()
+    return _h3_lookup_cache
+
+
+def snap_to_road(lat, lon, h3_lookup=None, max_dist_deg=0.003):
+    """Strict snap to nearest road node with distance + land validation.
+
+    Returns (snapped_lat, snapped_lon, snap_dist_m, snapped_valid).
+    - max_dist_deg=0.003 (~333m), aligned with notebook strict filtering.
+    - snapped_valid=False when point is too far from roads or outside land zones.
+    """
+    tree, arr = load_road_tree()
+    dist, idx = tree.query([lat, lon])
+    snap_dist_m = float(dist * 111_000)
+    if dist > max_dist_deg:
+        return None, None, snap_dist_m, False
+
+    snapped_lat, snapped_lon = float(arr[idx][0]), float(arr[idx][1])
+    lookup = h3_lookup if h3_lookup is not None else _get_h3_lookup_cached()
+    zone_id, _, _ = assign_h3_zone(snapped_lat, snapped_lon, lookup)
+    if zone_id == 0:
+        return None, None, snap_dist_m, False
+
+    return snapped_lat, snapped_lon, snap_dist_m, True

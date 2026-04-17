@@ -1,10 +1,12 @@
-"""Zone data helper — load zone_mapping.csv and provide zone assignment + centroid lookup."""
+"""Zone data helper — load zone_mapping.csv, H3 lookup, and provide zone assignment."""
 
 import csv
+import json
 import os
 
-# Path inside the Flink container (mounted via docker-compose)
+# Paths inside the Flink container (mounted via docker-compose)
 DEFAULT_ZONE_CSV = "/opt/flink/data/zone_mapping.csv"
+DEFAULT_H3_JSON = "/opt/flink/data/h3_zone_lookup.json"
 
 
 def load_zones(csv_path=None):
@@ -38,7 +40,34 @@ def assign_zone(lat, lon, zones):
     return None
 
 
-# Casablanca bounding box for validation
+# ── H3 Lookup ────────────────────────────────────────────────
+
+def load_h3_lookup(json_path=None):
+    """Load H3→zone lookup dict from JSON. Returns {h3_index: {zone_id, name}}."""
+    path = json_path or DEFAULT_H3_JSON
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+def assign_h3_zone(lat, lon, h3_lookup, resolution=9, max_rings=5):
+    """Assign GPS coordinate to zone via H3 O(1) lookup with ring fallback.
+    Returns (zone_id, zone_name, h3_cell) or (0, 'unknown', h3_cell) if not found.
+    """
+    import h3
+    cell = h3.latlng_to_cell(lat, lon, resolution)
+    if cell in h3_lookup:
+        info = h3_lookup[cell]
+        return info["zone_id"], info["name"], cell
+    for ring in range(1, max_rings + 1):
+        for neighbor in h3.grid_ring(cell, ring):
+            if neighbor in h3_lookup:
+                info = h3_lookup[neighbor]
+                return info["zone_id"], info["name"], cell
+    return 0, "unknown", cell
+
+
+# ── Validation ───────────────────────────────────────────────
+
 CASA_LAT_MIN = 33.450
 CASA_LAT_MAX = 33.680
 CASA_LON_MIN = -7.720

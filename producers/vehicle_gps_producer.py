@@ -35,6 +35,9 @@ from config import (
     BLACKOUT_DELAY,
     is_in_porto_metro,
     transform_to_casablanca,
+    load_h3_lookup,
+    assign_h3_zone,
+    snap_to_road,
 )
 
 logging.basicConfig(
@@ -84,6 +87,9 @@ def run(max_trips, speed):
     """Main producer loop."""
     import csv
 
+    h3_lookup = load_h3_lookup()
+    log.info("Loaded H3 lookup: %d cells", len(h3_lookup))
+
     producer = create_producer()
     log.info("Connected to Kafka at %s", KAFKA_BOOTSTRAP)
     log.info("Topic: %s | Speed: %dx | Max trips: %s",
@@ -125,6 +131,15 @@ def run(max_trips, speed):
                     continue
 
                 casa_lat, casa_lon = transform_to_casablanca(lat, lon)
+                casa_lat, casa_lon, snap_dist_m, snapped_valid = snap_to_road(
+                    casa_lat, casa_lon, h3_lookup=h3_lookup
+                )
+                if not snapped_valid:
+                    continue
+                zone_id, zone_name, h3_cell = assign_h3_zone(
+                    casa_lat, casa_lon, h3_lookup)
+                if zone_id == 0:
+                    continue  # skip points outside all zones (ocean/edge)
                 event_ts = base_ts + i * 15  # each point is 15s apart
 
                 speed_kmh = 0.0
@@ -152,6 +167,11 @@ def run(max_trips, speed):
                     "lon": round(casa_lon, 6),
                     "speed_kmh": speed_kmh,
                     "status": status,
+                    "h3_index": h3_cell,
+                    "zone_id": zone_id,
+                    "zone_name": zone_name,
+                    "snap_dist_m": round(snap_dist_m, 2),
+                    "snapped_valid": True,
                 }
 
                 # Simulate GPS blackout: delay sending (creates out-of-order)

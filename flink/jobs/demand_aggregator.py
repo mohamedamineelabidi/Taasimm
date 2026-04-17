@@ -22,17 +22,14 @@ import logging
 from datetime import datetime, timezone
 
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
-from pyflink.datastream.state import ValueStateDescriptor
-from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
+from pyflink.datastream.functions import ProcessWindowFunction, RuntimeContext
 from pyflink.datastream.connectors.kafka import (
     KafkaSource, KafkaSink, KafkaRecordSerializationSchema,
     KafkaOffsetsInitializer, DeliveryGuarantee,
 )
-from pyflink.common import WatermarkStrategy, Time, Types, Duration
+from pyflink.common import WatermarkStrategy, Time, Types
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.window import TumblingProcessingTimeWindows
-from pyflink.datastream.functions import ProcessWindowFunction
-from pyflink.datastream.state import ReducingStateDescriptor
 
 from cassandra.cluster import Cluster
 from cassandra.policies import DCAwareRoundRobinPolicy

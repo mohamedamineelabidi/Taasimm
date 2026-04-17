@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS vehicle_positions (
     lon         DOUBLE,
     speed       DOUBLE,
     status      TEXT,
+    h3_index    TEXT,
     PRIMARY KEY ((city, zone_id), event_time, taxi_id)
 ) WITH CLUSTERING ORDER BY (event_time DESC, taxi_id ASC)
   AND default_time_to_live = 86400;  -- 24h TTL for positions

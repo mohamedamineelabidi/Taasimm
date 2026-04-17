@@ -1,33 +1,28 @@
 # Next Steps and Update Log
 
-Last updated: 2026-04-12
+Last updated: 2026-04-17
 
-## Immediate Next Steps
+## Immediate Next Steps (Week 4)
 
-<<<<<<< HEAD
-1. Begin Week 4: Flink Job 2 — Demand Aggregator (30s tumbling windows per zone)
-2. Flink Job 3 — Trip Matcher (nearest vehicle + adjacent zone fallback)
-3. Grafana demand heatmap panel
-=======
-1. Start Docker Desktop / Docker daemon.
-2. Run `docker compose up -d` (stack now 13 containers; first start pulls `cp-kafka-connect-base:7.7.0` and downloads S3 Sink plugin).
-3. Wait for all healthchecks — especially Kafka Connect (~3 min) and Cassandra (~1 min).
-4. Run producer smoke tests:
-   - `.venv/Scripts/python.exe producers/vehicle_gps_producer.py --max-trips 5`
-   - `.venv/Scripts/python.exe producers/trip_request_producer.py --max-trips 5`
-5. Verify S3 Sink connector is running: `curl -s http://localhost:8083/connectors/taasim-s3-sink/status`
-6. Verify archived files appear: `docker exec taasim-minio mc ls -r local/kafka-archive/`
-7. Begin Week 3: Flink Job 1 (GPS Normalizer) + Grafana vehicle positions panel.
->>>>>>> c9685c6 ([task-6] Week 2: Kafka Connect S3 Sink archival, ADR-001, fix mldata bucket name)
+1. Verify Cassandra data population from Flink jobs (check vehicle_positions, demand_zones, trips tables)
+2. Test trip matching latency: request submission → Cassandra write < 5s P95
+3. Enhance Grafana: demand zone heatmap + trip match KPIs
+4. Spark ETL: Porto (1.8 GiB) + NYC (150 MiB) batch processing
+5. Feature engineering for ML: lag features, rolling averages, weather correlation
+6. Run full E2E integration test: 500+ trips, 5+ hour replay, measure SLAs
 
 ## Pending Verifications
 
-- Verify S3 Sink archival over longer producer runs
-- Verify Spark can read from s3a://kafka-archive/ (end-to-end test)
+- Verify trip matching accuracy (nearest vehicle assignment)
+- Verify adjacent zone fallback works when no vehicle in request zone
+- Verify demand zone window triggers every 30s
+- Verify S3 Sink archival over extended producer runs (8+ hours)
 
 ## Update Log
 
-<<<<<<< HEAD
+- 2026-04-17: Week 3 complete — All 3 Flink jobs deployed and running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand Aggregator + Trip Matcher operational. Kafka UI added. Data flow verified end-to-end. Created verification evidence doc (08_week3_completion.md).
+- 2026-04-17: Flink Job 2 (Demand Aggregator) deployed: processes.gps + raw.trips → 30s tumbling windows → demand_zones Cassandra + processed.demand topic.
+- 2026-04-17: Flink Job 3 (Trip Matcher) deployed: raw.trips + processed.gps → nearest vehicle matching → trips Cassandra + processed.matches topic.
 - 2026-04-12: Week 3 Sprint 3 completed — all 4 deliverables done.
 - 2026-04-12: Custom Flink Docker image built (PyFlink 1.18.1 + cassandra-driver + kafka-python).
 - 2026-04-12: Flink Job 1 GPS Normalizer deployed and running (2/2 tasks, job f1100660).
@@ -40,9 +35,6 @@ Last updated: 2026-04-12
 - 2026-04-12: Cassandra schema INSERT + SELECT tested on all 3 tables.
 - 2026-04-12: ADR v1 created (documents/07_adr_v1.md) — Kappa, partition keys, MinIO, retention.
 - 2026-04-12: Updated copilot-instructions.md with Week 2 progress (12 containers, S3 Sink configs, ADR).
-=======
-- 2026-04-07: Week 2 complete — Kafka Connect S3 Sink added to stack, connector config created, ADR-001 written, helper scripts added.
->>>>>>> c9685c6 ([task-6] Week 2: Kafka Connect S3 Sink archival, ADR-001, fix mldata bucket name)
 - 2026-04-03: Rewrote copilot-instructions.md with full 11-section architecture reference (343 lines).
 - 2026-04-03: Full infrastructure verification passed — all 11 containers healthy (Kafka, MinIO, Cassandra, Flink, Spark, Grafana, Jupyter).
 - 2026-04-03: Added change tracking guidelines to copilot-instructions.md.

@@ -32,6 +32,8 @@ from config import (
     TOPIC_TRIPS,
     load_zone_mapping,
     assign_zone,
+    load_h3_lookup,
+    assign_h3_zone,
 )
 
 logging.basicConfig(
@@ -115,6 +117,9 @@ def run(max_trips, base_rate):
         sys.exit(1)
     log.info("Loaded %d zones", len(zones))
 
+    h3_lookup = load_h3_lookup()
+    log.info("Loaded H3 lookup: %d cells", len(h3_lookup))
+
     producer = create_producer()
     log.info("Connected to Kafka at %s", KAFKA_BOOTSTRAP)
     log.info("Topic: %s | Base rate: %.1f trips/sec | Max: %s",
@@ -143,13 +148,27 @@ def run(max_trips, base_rate):
             trip_id = str(uuid.uuid4())
             rider_id = f"rider_{random.randint(1, rider_pool_size):05d}"
 
+            # Compute centroids and H3 cells for origin/destination
+            o_lat = (origin_zone["lat_min"] + origin_zone["lat_max"]) / 2
+            o_lon = (origin_zone["lon_min"] + origin_zone["lon_max"]) / 2
+            d_lat = (dest_zone["lat_min"] + dest_zone["lat_max"]) / 2
+            d_lon = (dest_zone["lon_min"] + dest_zone["lon_max"]) / 2
+            _, _, origin_h3 = assign_h3_zone(o_lat, o_lon, h3_lookup)
+            _, _, dest_h3 = assign_h3_zone(d_lat, d_lon, h3_lookup)
+
             event = {
                 "trip_id": trip_id,
                 "rider_id": rider_id,
                 "origin_zone": origin_zone["zone_id"],
                 "origin_zone_name": origin_zone["name"],
+                "origin_lat": round(o_lat, 6),
+                "origin_lon": round(o_lon, 6),
+                "origin_h3": origin_h3,
                 "destination_zone": dest_zone["zone_id"],
                 "destination_zone_name": dest_zone["name"],
+                "dest_lat": round(d_lat, 6),
+                "dest_lon": round(d_lon, 6),
+                "dest_h3": dest_h3,
                 "requested_at": now.isoformat(),
                 "call_type": pick_call_type(),
             }
