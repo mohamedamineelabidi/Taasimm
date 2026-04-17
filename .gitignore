@@ -2,6 +2,11 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Generated OSMnx cache files (large, regenerated on first run)
+data/casablanca_road_graph.graphml
+data/casablanca_polygon.geojson
+notebooks/cache/
 *.pyo
 
 # Large data files (stored in MinIO, not Git)
