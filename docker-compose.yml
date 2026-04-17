@@ -107,49 +107,6 @@ services:
   # ──────────────────────────────────────────────
   # 2b. KAFKA CONNECT — S3 Sink to MinIO
   # ──────────────────────────────────────────────
-  kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.6.0
-    container_name: taasim-kafka-connect
-    hostname: kafka-connect
-    ports:
-      - "8083:8083"
-    environment:
-      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
-      CONNECT_REST_PORT: 8083
-      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
-      CONNECT_GROUP_ID: taasim-connect
-      CONNECT_CONFIG_STORAGE_TOPIC: _connect-configs
-      CONNECT_OFFSET_STORAGE_TOPIC: _connect-offsets
-      CONNECT_STATUS_STORAGE_TOPIC: _connect-status
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
-    command:
-      - bash
-      - -c
-      - |
-        echo "Installing S3 Sink connector plugin..."
-        confluent-hub install --no-prompt confluentinc/kafka-connect-s3:10.5.7
-        echo "Launching Kafka Connect..."
-        /etc/confluent/docker/run
-    depends_on:
-      kafka:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    networks:
-      - taasim-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 90s
-
   # ──────────────────────────────────────────────
   # 3. CASSANDRA — NoSQL serving layer
   # ──────────────────────────────────────────────
