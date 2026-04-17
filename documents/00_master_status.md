@@ -1,6 +1,6 @@
 # TaaSim Project Master Status
 
-Last updated: 2026-04-12
+Last updated: 2026-04-17
 Project: TaaSim (Transport as a Service) - Casablanca
 
 ## Global Progress
@@ -8,7 +8,7 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - Week 1 / Sprint 1: COMPLETED
 - Week 2 / Sprint 2: COMPLETED
 - Week 3 / Sprint 3: COMPLETED
-- Currently targeting: Week 4 (Flink Jobs 2 & 3)
+- Currently targeting: Week 4 (Spark ETL + Enhanced Flink Job 2 & 3)
 
 ## Task Board — Week 1
 
@@ -40,13 +40,44 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [05_task_kafka_producers.md](05_task_kafka_producers.md)
 - [06_next_steps.md](06_next_steps.md)
 - [07_adr_v1.md](07_adr_v1.md)
+- [08_week3_completion.md](08_week3_completion.md) ← Week 3 Verification Report
 
 ## Current State Summary
 
-- 12 Docker containers running (Kafka, Kafka Connect, MinIO, Cassandra, Flink, Spark, Grafana, Jupyter + init containers)
+- 16 Docker containers running (Kafka, Kafka Connect, Kafka UI, MinIO, Cassandra, Flink JM + 3 TMs scaled, Spark, Grafana, Jupyter + init containers)
 - Kafka Connect S3 Sink archiving raw.gps and raw.trips to MinIO kafka-archive/ bucket
 - Cassandra schema deployed with 3 tables (vehicle_positions, trips, demand_zones)
 - GPS and trip producers tested end-to-end through Kafka → S3 Sink → MinIO
-- Flink Job 1 (GPS Normalizer) running on cluster: raw.gps → validate → zone assign → centroid snap → Cassandra + processed.gps
+- **Flink Job 1 (GPS Normalizer)** running on cluster: raw.gps → validate → zone assign → centroid snap → Cassandra + processed.gps
+- **Flink Job 2 (Demand Aggregator)** running: processed.gps + raw.trips → 30s windowed aggregation → demand_zones Cassandra + processed.demand
+- **Flink Job 3 (Trip Matcher)** running: raw.trips + processed.gps → nearest vehicle match → trip assignment Cassandra + processed.matches
+- Flink TaskManagers scaled to 3 instances (12 total slots, 9 slots occupied by 3 jobs)
 - Flink checkpointing to MinIO (s3://curated/flink-checkpoints/) verified — 10+ checkpoints completed
 - Grafana vehicle tracking dashboard deployed with Geomap, zone bar chart, and event table
+- Kafka UI added to stack for topic monitoring
+- GPS producer generating 10× replay speed from Porto dataset with zone remapping + noise
+
+## Week 3 Verification Summary (2026-04-17)
+
+**Pipeline Status**: ✅ OPERATIONAL END-TO-END
+- All 3 Flink jobs deployed and running successfully
+- Flink Web UI: http://localhost:8081 (showing 12 slots, 3 jobs)
+- TaskManagers: 3 running (scaled deployment)
+- Kafka topics: raw.gps, raw.trips, processed.gps, processed.demand, processed.matches all active
+- Cassandra: schema verified, ready for data ingestion
+- MinIO: kafka-archive bucket receiving S3 Sink data
+- Grafana: dashboards configured, ready for visualization
+
+**Data Flow Confirmation**:
+- GPS events: raw.gps topic active → Flink Job 1 consuming → processed.gps producing
+- Trip requests: raw.trips topic active → Flink Jobs 2, 3 consuming
+- Producers: vehicle_gps_producer.py and trip_request_producer.py tested (50 trips successful)
+
+**Infrastructure Health**:
+- Flink JobManager: HEALTHY
+- All TaskManagers: RUNNING
+- Kafka: HEALTHY
+- Cassandra: HEALTHY
+- MinIO: HEALTHY
+- Grafana: RUNNING (health check starting)
+- Kafka UI: RUNNING (health check starting)

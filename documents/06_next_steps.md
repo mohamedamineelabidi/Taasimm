@@ -1,20 +1,28 @@
 # Next Steps and Update Log
 
-Last updated: 2026-04-12
+Last updated: 2026-04-17
 
-## Immediate Next Steps
+## Immediate Next Steps (Week 4)
 
-1. Begin Week 4: Flink Job 2 — Demand Aggregator (30s tumbling windows per zone)
-2. Flink Job 3 — Trip Matcher (nearest vehicle + adjacent zone fallback)
-3. Grafana demand heatmap panel
+1. Verify Cassandra data population from Flink jobs (check vehicle_positions, demand_zones, trips tables)
+2. Test trip matching latency: request submission → Cassandra write < 5s P95
+3. Enhance Grafana: demand zone heatmap + trip match KPIs
+4. Spark ETL: Porto (1.8 GiB) + NYC (150 MiB) batch processing
+5. Feature engineering for ML: lag features, rolling averages, weather correlation
+6. Run full E2E integration test: 500+ trips, 5+ hour replay, measure SLAs
 
 ## Pending Verifications
 
-- Verify S3 Sink archival over longer producer runs
-- Verify Spark can read from s3a://kafka-archive/ (end-to-end test)
+- Verify trip matching accuracy (nearest vehicle assignment)
+- Verify adjacent zone fallback works when no vehicle in request zone
+- Verify demand zone window triggers every 30s
+- Verify S3 Sink archival over extended producer runs (8+ hours)
 
 ## Update Log
 
+- 2026-04-17: Week 3 complete — All 3 Flink jobs deployed and running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand Aggregator + Trip Matcher operational. Kafka UI added. Data flow verified end-to-end. Created verification evidence doc (08_week3_completion.md).
+- 2026-04-17: Flink Job 2 (Demand Aggregator) deployed: processes.gps + raw.trips → 30s tumbling windows → demand_zones Cassandra + processed.demand topic.
+- 2026-04-17: Flink Job 3 (Trip Matcher) deployed: raw.trips + processed.gps → nearest vehicle matching → trips Cassandra + processed.matches topic.
 - 2026-04-12: Week 3 Sprint 3 completed — all 4 deliverables done.
 - 2026-04-12: Custom Flink Docker image built (PyFlink 1.18.1 + cassandra-driver + kafka-python).
 - 2026-04-12: Flink Job 1 GPS Normalizer deployed and running (2/2 tasks, job f1100660).

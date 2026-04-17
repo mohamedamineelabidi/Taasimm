@@ -26,14 +26,13 @@ from datetime import datetime, timezone
 
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
 from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
-from pyflink.datastream.state import MapStateDescriptor, ValueStateDescriptor, StateTtlConfig
-from pyflink.common import WatermarkStrategy, Types, Duration, Time
+from pyflink.datastream.state import MapStateDescriptor, StateTtlConfig
+from pyflink.common import WatermarkStrategy, Types, Time
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors.kafka import (
     KafkaSource, KafkaSink, KafkaRecordSerializationSchema,
     KafkaOffsetsInitializer, DeliveryGuarantee,
 )
-from pyflink.datastream.timerservice import TimerService
 
 from cassandra.cluster import Cluster
 from cassandra.policies import DCAwareRoundRobinPolicy

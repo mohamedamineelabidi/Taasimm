@@ -231,8 +231,6 @@ services:
 
   flink-taskmanager:
     build: ./flink
-    container_name: taasim-flink-tm
-    hostname: flink-taskmanager
     entrypoint: /opt/flink/entrypoint-wrapper.sh
     command: taskmanager
     environment:
@@ -326,11 +324,15 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
+      GODEBUG: netdns=cgo
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./config/grafana-datasource.yml:/etc/grafana/provisioning/datasources/cassandra.yml
     depends_on:
       cassandra:
         condition: service_healthy
+    extra_hosts:
+      - "cassandra:172.28.0.5"
     networks:
       - taasim-net
     healthcheck:
@@ -342,6 +344,35 @@ services:
 
   # ──────────────────────────────────────────────
   # 7. JUPYTER — Notebook environment for EDA
+  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────
+  # 8. KAFKA UI — Browse topics, messages, consumer groups
+  # ──────────────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: taasim-kafka-ui
+    hostname: kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: taasim
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: taasim-connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ──────────────────────────────────────────────
+  # 9. JUPYTER — Notebook environment for EDA
   # ──────────────────────────────────────────────
   jupyter:
     image: jupyter/pyspark-notebook:latest

@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: Cassandra
+    type: hadesarchitect-cassandra-datasource
+    access: proxy
+    isDefault: true
+    uid: cassandra-ds
+    jsonData:
+      host: 172.28.0.5
+      port: 9042
+      keyspace: taasim
+      consistency: ONE
