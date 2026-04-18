@@ -72,9 +72,6 @@ HOURLY_MULTIPLIER = [
 ]
 
 # Call type distribution (Porto: B=48%, C=40%, A=12%)
-CALL_TYPES = ["A", "B", "B", "B", "B", "C", "C", "C", "C"]
-# Weighted sampling: 4/9 B ≈ 44%, 4/9 C ≈ 44%, 1/9 A ≈ 11%
-# Closer match via explicit weights:
 CALL_TYPE_WEIGHTS = {"A": 0.12, "B": 0.48, "C": 0.40}
 
 
@@ -148,11 +145,11 @@ def run(max_trips, base_rate):
             trip_id = str(uuid.uuid4())
             rider_id = f"rider_{random.randint(1, rider_pool_size):05d}"
 
-            # Compute centroids and H3 cells for origin/destination
-            o_lat = (origin_zone["lat_min"] + origin_zone["lat_max"]) / 2
-            o_lon = (origin_zone["lon_min"] + origin_zone["lon_max"]) / 2
-            d_lat = (dest_zone["lat_min"] + dest_zone["lat_max"]) / 2
-            d_lon = (dest_zone["lon_min"] + dest_zone["lon_max"]) / 2
+            # Randomize coordinates within zone bounds (not always centroid)
+            o_lat = random.uniform(origin_zone["lat_min"], origin_zone["lat_max"])
+            o_lon = random.uniform(origin_zone["lon_min"], origin_zone["lon_max"])
+            d_lat = random.uniform(dest_zone["lat_min"], dest_zone["lat_max"])
+            d_lon = random.uniform(dest_zone["lon_min"], dest_zone["lon_max"])
             _, _, origin_h3 = assign_h3_zone(o_lat, o_lon, h3_lookup)
             _, _, dest_h3 = assign_h3_zone(d_lat, d_lon, h3_lookup)
 
