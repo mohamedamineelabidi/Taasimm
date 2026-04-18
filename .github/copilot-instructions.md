@@ -23,7 +23,7 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Notebooks | Jupyter (pyspark-notebook) | EDA and zone remapping analysis |
 
 ### Source-of-Truth Files
-- `docker-compose.yml` — all 12 container definitions (Kafka, Kafka Connect, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter)
+- `docker-compose.yml` — all 14 container definitions (Kafka, Kafka Connect, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter, GPS producer, Trip producer)
 - `config/cassandra-init.cql` — keyspace `taasim` + 3 tables with partition key justification
 - `config/connect-s3-sink-gps.json` — S3 Sink connector config for `raw.gps` topic
 - `config/connect-s3-sink-trips.json` — S3 Sink connector config for `raw.trips` topic
@@ -34,8 +34,8 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 ### Kafka Topics
 | Topic | Producer | Consumer |
 |-------|---------|----------|
-| `raw.gps` | vehicle_gps_producer.py | Flink Job 1 |
-| `raw.trips` | trip_request_producer.py | Flink Job 2, Job 3 |
+| `raw.gps` | gps-producer container | Flink Job 1 |
+| `raw.trips` | trip-producer container | Flink Job 2, Job 3 |
 | `processed.gps` | Flink Job 1 | Flink Job 2 |
 | `processed.demand` | Flink Job 2 | Grafana / API |
 | `processed.matches` | Flink Job 3 | API |
@@ -192,6 +192,7 @@ Taasimm/
 │   ├── nyc-tlc/                       ← NYC Parquet (gitignored, in MinIO)
 │   └── remapped_trips_sample.csv      ← sample output (gitignored)
 ├── producers/
+│   ├── Dockerfile                     ← Producer container image
 │   ├── config.py                      ← shared constants & transforms
 │   ├── vehicle_gps_producer.py        ← GPS event simulator
 │   └── trip_request_producer.py       ← trip request simulator

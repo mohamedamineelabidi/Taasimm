@@ -36,7 +36,9 @@ BLACKOUT_DELAY = (60, 180)   # delay range in seconds
 REPLAY_SPEED = 10            # 10x real-time
 
 # ── Zone mapping CSV path ────────────────────────────────────────────
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+# /data is the container mount; fall back to ../data for local dev
+_local_data = os.path.join(os.path.dirname(__file__), "..", "data")
+DATA_DIR = "/data" if os.path.isdir("/data") else _local_data
 ZONE_MAPPING_PATH = os.path.join(DATA_DIR, "zone_mapping.csv")
 PORTO_CSV_PATH = os.path.join(DATA_DIR, "train.csv")
 H3_LOOKUP_PATH = os.path.join(DATA_DIR, "h3_zone_lookup.json")
