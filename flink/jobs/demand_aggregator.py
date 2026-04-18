@@ -124,7 +124,7 @@ class DemandWindowFunction(ProcessWindowFunction):
                 pass
 
         unique_vehicles = len(vehicle_ids)
-        ratio = unique_vehicles / max(1, trip_count)
+        ratio = trip_count / max(1, unique_vehicles)
         window_start_dt = datetime.fromtimestamp(window_start_ms / 1000, tz=timezone.utc)
         # forecast_demand: placeholder until ML model deployed (Week 6)
         forecast_demand = 0.0
@@ -189,7 +189,7 @@ def main():
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics("processed.gps")
         .set_group_id("demand-aggregator-gps")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )
@@ -200,7 +200,7 @@ def main():
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics("raw.trips")
         .set_group_id("demand-aggregator-trips")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )
