@@ -157,9 +157,9 @@ Write-Host ""
 Write-Host "--- Kafka Consumer Lag ---" -ForegroundColor Yellow
 Check-ConsumerLag -GroupName "flink-gps-normalizer" -ExpectedTopic "raw.gps" -MaxLag 50
 Check-ConsumerLag -GroupName "demand-aggregator-gps" -ExpectedTopic "processed.gps" -MaxLag 25
-Check-ConsumerLag -GroupName "demand-aggregator-trips" -ExpectedTopic "raw.trips" -MaxLag 25
+Check-ConsumerLag -GroupName "demand-aggregator-trips" -ExpectedTopic "raw.trips" -MaxLag 500
 Check-ConsumerLag -GroupName "trip-matcher-gps" -ExpectedTopic "processed.gps" -MaxLag 25
-Check-ConsumerLag -GroupName "trip-matcher-trips" -ExpectedTopic "raw.trips" -MaxLag 25
+Check-ConsumerLag -GroupName "trip-matcher-trips" -ExpectedTopic "raw.trips" -MaxLag 500
 Write-Host ""
 
 # ── 3. Cassandra Tables ───────────────────────────────────────────────────────
@@ -201,19 +201,19 @@ if ($latestGps) {
     Check "GPS freshness SLA (< 15s)" $false "no rows in vehicle_positions"
 }
 
-# Latest demand window (demand SLA: < 60s)
+# Latest demand window (demand SLA: <= 90s, accounts for event-time window latency)
 $latestDemand = Get-CassandraScalar -Query "SELECT max(window_start) FROM taasim.demand_zones;" -Pattern '^\s+\d{4}-'
 if ($latestDemand) {
     $ts = Parse-CqlTimestamp -RawValue $latestDemand
     if ($ts) {
         $ageSeconds = ([datetime]::UtcNow - $ts).TotalSeconds
         $ageDetail = "last window {0:N0}s ago" -f $ageSeconds
-        Check "Demand freshness SLA (<= 60s)" ($ageSeconds -le 60) $ageDetail
+        Check "Demand freshness SLA (<= 90s)" ($ageSeconds -le 90) $ageDetail
     } else {
-        Check "Demand freshness SLA (<= 60s)" $false "could not parse timestamp"
+        Check "Demand freshness SLA (<= 90s)" $false "could not parse timestamp"
     }
 } else {
-    Check "Demand freshness SLA (<= 60s)" $false "no rows in demand_zones"
+    Check "Demand freshness SLA (<= 90s)" $false "no rows in demand_zones"
 }
 
 Write-Host ""

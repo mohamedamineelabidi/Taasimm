@@ -27,9 +27,9 @@ from pyflink.datastream.connectors.kafka import (
     KafkaSource, KafkaSink, KafkaRecordSerializationSchema,
     KafkaOffsetsInitializer, DeliveryGuarantee,
 )
-from pyflink.common import WatermarkStrategy, Time, Types
+from pyflink.common import WatermarkStrategy, Time, Types, Duration
 from pyflink.common.serialization import SimpleStringSchema
-from pyflink.datastream.window import TumblingProcessingTimeWindows
+from pyflink.datastream.window import TumblingEventTimeWindows
 
 from cassandra.cluster import Cluster
 
@@ -46,10 +46,13 @@ class GpsTimestampAssigner:
     def extract_timestamp(self, value, record_timestamp):
         try:
             event = json.loads(value)
-            ts = event.get("timestamp", 0)
-            return int(ts) * 1000
+            event_time = event.get("event_time", "")
+            if event_time:
+                dt = datetime.fromisoformat(event_time.replace("Z", "+00:00"))
+                return int(dt.timestamp() * 1000)
         except Exception:
-            return record_timestamp
+            pass
+        return record_timestamp
 
 
 class TripTimestampAssigner:
@@ -138,11 +141,6 @@ class DemandWindowFunction(ProcessWindowFunction):
                 logger.error(f"Cassandra write failed: {e}")
                 self._cassandra_session = None  # force reconnect on next window
 
-        # P3 note: TumblingProcessingTimeWindows (not event-time) is intentional.
-        # Porto GPS timestamps are 2013-era; trip timestamps are 2026 real-time.
-        # Aligning both streams by event-time is architecturally impossible without
-        # timestamp normalization. Processing-time windows give correct wall-clock
-        # 30s aggregation for the Grafana heatmap.
         output = json.dumps({
             "city": city,
             "zone_id": zone_id,
@@ -169,11 +167,21 @@ def main():
     env.get_checkpoint_config().set_min_pause_between_checkpoints(30_000)
     env.get_checkpoint_config().set_checkpoint_timeout(120_000)
 
-    # ── Watermark strategy: use ingestion time for both streams
-    # GPS timestamps are 2013 (Porto replay); trips are 2026 real-time.
-    # Use ingestion-time watermarks so both streams advance together.
-    gps_watermark = WatermarkStrategy.for_monotonous_timestamps()
-    trip_watermark = WatermarkStrategy.for_monotonous_timestamps()
+    # -- Watermark strategy: event-time with bounded out-of-orderness
+    # Both GPS and trip timestamps are now 2026 real-time (fixed in commit 712cf55)
+    # with_idleness: if one source stalls, don't hold back the watermark
+    gps_watermark = (
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(10))
+        .with_timestamp_assigner(GpsTimestampAssigner())
+        .with_idleness(Duration.of_seconds(15))
+    )
+    trip_watermark = (
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(10))
+        .with_timestamp_assigner(TripTimestampAssigner())
+        .with_idleness(Duration.of_seconds(15))
+    )
 
     # ── GPS source (processed.gps from Job 1) ─────────────────
     gps_source = (
@@ -251,7 +259,7 @@ def main():
     result = (
         combined
         .key_by(lambda x: (x[0], x[1]))
-        .window(TumblingProcessingTimeWindows.of(Time.seconds(WINDOW_SECONDS)))
+        .window(TumblingEventTimeWindows.of(Time.seconds(WINDOW_SECONDS)))
         .process(DemandWindowFunction(), output_type=Types.STRING())
     )
 

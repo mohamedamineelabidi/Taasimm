@@ -9,7 +9,7 @@ import logging
 import time
 from datetime import datetime
 
-from pyflink.common import Types, WatermarkStrategy, Duration, Row
+from pyflink.common import Types, WatermarkStrategy, Duration, Row, Time
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.common.watermark_strategy import TimestampAssigner
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
@@ -19,7 +19,8 @@ from pyflink.datastream.connectors.kafka import (
     KafkaSink,
     KafkaRecordSerializationSchema,
 )
-from pyflink.datastream.functions import MapFunction, FilterFunction, RuntimeContext
+from pyflink.datastream.functions import KeyedProcessFunction, FilterFunction, RuntimeContext
+from pyflink.datastream.state import ValueStateDescriptor, StateTtlConfig
 
 # zone_data functions inlined to avoid module resolution issues in PyFlink Beam workers
 
@@ -53,14 +54,27 @@ class GpsTimestampAssigner(TimestampAssigner):
             return record_timestamp
 
 
-# ─── GPS Processing Function ────────────────────────────────
+# ─── GPS Deduplication + Processing ─────────────────────────
 
-class GpsProcessor(MapFunction):
-    """Validate, assign zone, anonymize coordinates, prepare for sinks."""
+class GpsDeduplicator(KeyedProcessFunction):
+    """Keyed by taxi_id. Deduplicates GPS pings via ValueState, then
+    validates, assigns zone, anonymizes to centroid, writes Cassandra + Kafka."""
 
     def open(self, runtime_context: RuntimeContext):
         import csv
-        # H3 is pre-computed by producer — no need to import h3 here
+
+        # ValueState for per-taxi deduplication (last seen event_time in ms)
+        ttl_config = (
+            StateTtlConfig
+            .new_builder(Time.minutes(5))
+            .set_update_type(StateTtlConfig.UpdateType.OnCreateAndWrite)
+            .set_state_visibility(StateTtlConfig.StateVisibility.NeverReturnExpired)
+            .build()
+        )
+        ts_desc = ValueStateDescriptor("last_ts", Types.LONG())
+        ts_desc.enable_time_to_live(ttl_config)
+        self._last_ts = runtime_context.get_state(ts_desc)
+
         CASA_LAT_MIN, CASA_LAT_MAX = 33.450, 33.680
         CASA_LON_MIN, CASA_LON_MAX = -7.720, -7.480
         self._bounds = (CASA_LAT_MIN, CASA_LAT_MAX, CASA_LON_MIN, CASA_LON_MAX)
@@ -103,55 +117,73 @@ class GpsProcessor(MapFunction):
         if hasattr(self, "cluster"):
             self.cluster.shutdown()
 
-    def map(self, value):
+    def process_element(self, value, ctx: KeyedProcessFunction.Context):
         try:
-            data = json.loads(value)
-        except json.JSONDecodeError:
-            return None
+            raw_json = value[1] if isinstance(value, (tuple, list)) else value
+            data = json.loads(raw_json)
+        except (json.JSONDecodeError, IndexError):
+            return
+
+        event_time_str = data.get("event_time")
+        if event_time_str is None:
+            return
+
+        # Parse event_time to millis for dedup check
+        try:
+            event_ts_ms = int(datetime.fromisoformat(
+                event_time_str.replace("Z", "+00:00")
+            ).timestamp() * 1000)
+        except (ValueError, TypeError):
+            return
+
+        # Deduplicate: skip if event_time <= last seen for this taxi_id
+        last_ts = self._last_ts.value()
+        if last_ts is not None and event_ts_ms <= last_ts:
+            return
+        self._last_ts.update(event_ts_ms)
 
         lat = data.get("lat")
         lon = data.get("lon")
         speed = data.get("speed_kmh", 0.0)
         taxi_id = data.get("taxi_id", "unknown")
         status = data.get("status", "unknown")
-        event_time_str = data.get("event_time")
         snap_dist_m = data.get("snap_dist_m")
 
-        if lat is None or lon is None or event_time_str is None:
-            return None
+        if lat is None or lon is None:
+            return
 
-        # Validate coordinates and speed (inlined is_valid_gps)
+        # Validate coordinates and speed
         b = self._bounds
         if not (b[0] <= lat <= b[1] and b[2] <= lon <= b[3]):
-            return None
+            return
         if speed is not None and speed > 150.0:
-            return None
+            return
         if snap_dist_m is not None and float(snap_dist_m) > 333.0:
-            return None
+            return
 
-        # Trust producer's pre-computed H3 cell — no recomputation (P2 fix)
+        # Trust producer's pre-computed H3 cell
         cell = data.get("h3_index")
         if not cell:
-            return None
+            return
         zone_id = None
         if cell in self.h3_lookup:
             zone_id = self.h3_lookup[cell]["zone_id"]
         if zone_id is None:
-            return None
+            return
 
         # Anonymize: snap to zone centroid
         centroid = self.zone_centroids.get(zone_id)
         if centroid is None:
-            return None
+            return
         centroid_lat, centroid_lon = centroid
 
-        # Parse canonical event_time ISO string
+        # Parse canonical event_time
         try:
             event_time = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
         except ValueError:
-            return None
+            return
 
-        # Write to Cassandra (anonymized: centroid coordinates)
+        # Write to Cassandra
         try:
             self.session.execute(
                 self.insert_stmt,
@@ -161,19 +193,30 @@ class GpsProcessor(MapFunction):
         except Exception as e:
             logger.error(f"Cassandra write error: {e}")
 
-        # Build output record for processed.gps Kafka topic
-        # lat/lon are centroid values (anonymized) — named explicitly
+        # Build output for processed.gps
         output = {
             "taxi_id": taxi_id,
             "zone_id": zone_id,
             "h3_index": cell,
-            "event_time": event_time_str,  # pass through ISO string unchanged
+            "event_time": event_time_str,
             "centroid_lat": centroid_lat,
             "centroid_lon": centroid_lon,
             "speed_kmh": speed,
             "status": status,
         }
-        return json.dumps(output)
+        yield json.dumps(output)
+
+
+def extract_key(value):
+    """Extract taxi_id from raw GPS JSON for key_by partitioning."""
+    try:
+        data = json.loads(value)
+        taxi_id = data.get("taxi_id")
+        if taxi_id:
+            return (taxi_id, value)
+    except Exception:
+        pass
+    return None
 
 
 class NullFilter(FilterFunction):
@@ -219,10 +262,18 @@ def main():
         kafka_source, watermark_strategy, "KafkaGPSSource"
     )
 
-    # Process: validate → assign zone → anonymize → write Cassandra
-    processed_stream = (
+    # Pre-map: extract taxi_id for keyed deduplication
+    keyed_stream = (
         gps_stream
-        .map(GpsProcessor(), output_type=Types.STRING())
+        .map(extract_key, output_type=Types.TUPLE([Types.STRING(), Types.STRING()]))
+        .filter(lambda x: x is not None)
+    )
+
+    # Deduplicate → validate → zone assign → anonymize → Cassandra write
+    processed_stream = (
+        keyed_stream
+        .key_by(lambda x: x[0])
+        .process(GpsDeduplicator(), output_type=Types.STRING())
         .filter(NullFilter())
     )
 

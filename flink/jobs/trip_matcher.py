@@ -25,7 +25,7 @@ import logging
 from datetime import datetime, timezone
 
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
-from pyflink.datastream.functions import KeyedProcessFunction, RuntimeContext
+from pyflink.datastream.functions import KeyedProcessFunction, FlatMapFunction, RuntimeContext
 from pyflink.datastream.state import MapStateDescriptor, StateTtlConfig
 from pyflink.common import WatermarkStrategy, Types, Time
 from pyflink.common.serialization import SimpleStringSchema
@@ -93,9 +93,10 @@ class TripMatcherFunction(KeyedProcessFunction):
     def __init__(self):
         self._zones = None
         self._zone_adjacency = {}
-        self._vehicles = None         # MapState: taxi_id → {lat, lon, speed, ts}
+        self._vehicles = None         # MapState: taxi_id -> {lat, lon, speed}
         self._cassandra_session = None
         self._trip_insert_stmt = None
+        self._matched_trips = set()   # dedup: prevent same trip matched by multiple zones
 
     def open(self, runtime_context: RuntimeContext):
         # Load zone adjacency map from CSV directly (no zone_data module dependency)
@@ -167,9 +168,10 @@ class TripMatcherFunction(KeyedProcessFunction):
         event_type = event.get("_type", "gps")
 
         if event_type == "gps":
-            # Store vehicle state — use centroid_lat/centroid_lon from processed.gps
+            # Store vehicle state -- only track available vehicles
             taxi_id = event.get("taxi_id", "")
-            if taxi_id:
+            status = event.get("status", "")
+            if taxi_id and status not in ("matched", "offline"):
                 vehicle_data = json.dumps({
                     "lat": event.get("centroid_lat", event.get("lat", 0)),
                     "lon": event.get("centroid_lon", event.get("lon", 0)),
@@ -178,20 +180,27 @@ class TripMatcherFunction(KeyedProcessFunction):
                 self._vehicles.put(taxi_id, vehicle_data)
 
         elif event_type == "trip":
+            # Dedup: skip if this trip was already matched (fanout from adjacent zones)
+            trip_id = event.get("trip_id")
+            if trip_id and trip_id in self._matched_trips:
+                return
+
             # Attempt to match a vehicle
             zone_id = ctx.get_current_key()
             matched = self._find_best_vehicle(zone_id, event)
 
-            if matched is None:
-                # Try adjacent zones
-                for adj_zone in self._zone_adjacency.get(zone_id, []):
-                    # We can only access our current zone's state;
-                    # For adjacent zones we emit an unmatched event for simplicity
-                    # (full cross-zone state would require a broadcast state or side output)
-                    pass
-
             if matched:
                 taxi_id, eta_seconds, fare = matched
+                # Remove matched vehicle from state to prevent ghost-taxi double-matching
+                try:
+                    self._vehicles.remove(taxi_id)
+                except Exception:
+                    pass
+                if trip_id:
+                    self._matched_trips.add(trip_id)
+                    # Prevent unbounded growth
+                    if len(self._matched_trips) > 50000:
+                        self._matched_trips.clear()
                 self._write_match(event, taxi_id, zone_id, eta_seconds, fare)
                 yield json.dumps({
                     "trip_id": event.get("trip_id"),
@@ -216,9 +225,14 @@ class TripMatcherFunction(KeyedProcessFunction):
                 })
 
     def _find_best_vehicle(self, zone_id, trip_event):
-        """Return (taxi_id, eta_seconds, fare) for nearest vehicle or None."""
+        """Return (taxi_id, eta_seconds, fare) for best vehicle or None.
+
+        Cost function: score = 0.7 * distance_km + 0.3 * idle_penalty
+        idle_penalty = 1.0 if speed < 5 km/h (stationary), else 0.0
+        """
         best_taxi = None
-        best_dist = float("inf")
+        best_score = float("inf")
+        best_dist = 0.0
 
         o_lat = trip_event.get("origin_lat", 0)
         o_lon = trip_event.get("origin_lon", 0)
@@ -229,9 +243,14 @@ class TripMatcherFunction(KeyedProcessFunction):
                 v_lat = data.get("lat", 0)
                 v_lon = data.get("lon", 0)
                 dist = haversine_km(o_lat, o_lon, v_lat, v_lon)
-                if dist < best_dist:
-                    best_dist = dist
+                speed = data.get("speed_kmh", 0)
+                # Prefer moving vehicles over idle ones (lower score = better)
+                idle_penalty = 1.0 if speed < 5 else 0.0
+                score = 0.7 * dist + 0.3 * idle_penalty
+                if score < best_score:
+                    best_score = score
                     best_taxi = taxi_id
+                    best_dist = dist
         except Exception as e:
             logger.error(f"Vehicle lookup failed: {e}")
             return None
@@ -305,6 +324,40 @@ class TripMatcherFunction(KeyedProcessFunction):
             logger.error(f"Cassandra unmatched write failed: {e}")
 
 
+class TripFanout(FlatMapFunction):
+    """Emit trip events to origin zone + all adjacent zones for cross-zone matching."""
+
+    def open(self, runtime_context: RuntimeContext):
+        import csv
+        self._adjacency = {}
+        try:
+            with open("/opt/flink/data/zone_mapping.csv", "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    zid = int(row["zone_id"])
+                    adj = row.get("adjacent_zones", "")
+                    self._adjacency[zid] = [
+                        int(x.strip()) for x in str(adj).split(",") if x.strip().isdigit()
+                    ] if adj else []
+        except Exception:
+            pass
+        logger.info(f"TripFanout loaded adjacency for {len(self._adjacency)} zones")
+
+    def flat_map(self, value):
+        try:
+            event = json.loads(value)
+            event["_type"] = "trip"
+            zone_id = int(event.get("origin_zone", 0))
+            if zone_id == 0:
+                return
+            event_json = json.dumps(event)
+            yield (zone_id, event_json)
+            for adj in self._adjacency.get(zone_id, []):
+                yield (adj, event_json)
+        except Exception:
+            return
+
+
 def main():
     logger.info("=== Trip Matcher Job Starting ===")
 
@@ -363,26 +416,14 @@ def main():
         except Exception:
             return None
 
-    def tag_trip(value):
-        try:
-            event = json.loads(value)
-            event["_type"] = "trip"
-            zone_id = int(event.get("origin_zone", 0))
-            if zone_id == 0:
-                return None
-            return (zone_id, json.dumps(event))
-        except Exception:
-            return None
+    trip_stream = (
+        env.from_source(trip_source, trip_wm, "Trip Source")
+        .flat_map(TripFanout(), output_type=Types.TUPLE([Types.INT(), Types.STRING()]))
+    )
 
     gps_stream = (
         env.from_source(gps_source, gps_wm, "GPS Source")
         .map(tag_gps, output_type=Types.TUPLE([Types.INT(), Types.STRING()]))
-        .filter(lambda x: x is not None)
-    )
-
-    trip_stream = (
-        env.from_source(trip_source, trip_wm, "Trip Source")
-        .map(tag_trip, output_type=Types.TUPLE([Types.INT(), Types.STRING()]))
         .filter(lambda x: x is not None)
     )
 
