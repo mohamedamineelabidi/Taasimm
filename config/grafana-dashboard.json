@@ -106,6 +106,14 @@
               }
             }
           }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              { "targetField": "zone_id", "destinationType": "string" }
+            ]
+          }
         }
       ]
     },
@@ -180,6 +188,14 @@
               "active_vehicles": { "operation": "aggregate", "aggregations": ["lastNotNull"] },
               "pending_requests": { "operation": "aggregate", "aggregations": ["lastNotNull"] }
             }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              { "targetField": "zone_id", "destinationType": "string" }
+            ]
           }
         }
       ]
