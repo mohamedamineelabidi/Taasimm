@@ -53,8 +53,13 @@ Write-Host "=== TaaSim Flink Job Submission ===" -ForegroundColor Cyan
 Write-Host "Submitting jobs: $($jobIds -join ', ')" -ForegroundColor Cyan
 Write-Host ""
 
+# ── Ensure live Cassandra schema matches repo contract ───────────────────────
+Write-Host "[0/4] Ensuring Cassandra schema is current..." -ForegroundColor Yellow
+& "$PSScriptRoot/ensure-cassandra-schema.ps1"
+Write-Host ""
+
 # ── Check stack is running ────────────────────────────────────────────────────
-Write-Host "[0/3] Checking Flink JobManager is healthy..." -ForegroundColor Yellow
+Write-Host "[1/4] Checking Flink JobManager is healthy..." -ForegroundColor Yellow
 $jmStatus = docker ps --filter "name=$JM" --filter "status=running" --format "{{.Names}}"
 if (-not $jmStatus) {
     Write-Error "Container '$JM' is not running. Run: docker compose up -d"
@@ -71,7 +76,7 @@ Write-Host "  Flink version: $($overview.'flink-version')  |  TaskManagers: $($o
 Write-Host ""
 
 # ── Ensure output Kafka topics exist ─────────────────────────────────────────
-Write-Host "[1/3] Ensuring output Kafka topics exist..." -ForegroundColor Yellow
+Write-Host "[2/4] Ensuring output Kafka topics exist..." -ForegroundColor Yellow
 $topicsToCreate = @("processed.gps", "processed.demand", "processed.matches")
 foreach ($topic in $topicsToCreate) {
     $exists = docker exec taasim-kafka /opt/kafka/bin/kafka-topics.sh `
@@ -92,7 +97,7 @@ foreach ($topic in $topicsToCreate) {
 Write-Host ""
 
 # ── Cancel any existing running versions of the same jobs ────────────────────
-Write-Host "[2/3] Checking for already-running jobs to avoid duplicates..." -ForegroundColor Yellow
+Write-Host "[3/4] Checking for already-running jobs to avoid duplicates..." -ForegroundColor Yellow
 $runningJobsJson = docker exec $JM curl -s http://localhost:8081/jobs 2>$null
 if ($runningJobsJson) {
     $runningJobs = ($runningJobsJson | ConvertFrom-Json).jobs
@@ -113,7 +118,7 @@ if ($runningJobsJson) {
 Write-Host ""
 
 # ── Submit jobs ───────────────────────────────────────────────────────────────
-Write-Host "[3/3] Submitting PyFlink jobs..." -ForegroundColor Yellow
+Write-Host "[4/4] Submitting PyFlink jobs..." -ForegroundColor Yellow
 $submitted = @()
 $failed = @()
 

@@ -119,7 +119,9 @@ def run(max_trips, speed):
 
             taxi_id = row.get("TAXI_ID", "unknown")
             trip_id = row.get("TRIP_ID", str(uuid.uuid4()))
-            base_ts = int(row.get("TIMESTAMP", int(time.time())))
+            # Rebase to current wall-clock time so Flink watermarks
+            # and Cassandra TTLs work with real timestamps, not 2013.
+            base_ts = int(time.time())
 
             # Determine if this vehicle has a GPS blackout
             has_blackout = random.random() < BLACKOUT_PROB

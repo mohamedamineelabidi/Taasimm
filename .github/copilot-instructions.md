@@ -103,6 +103,15 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 
 # Verify S3 Sink archival
 docker exec taasim-minio mc ls local/kafka-archive/ --recursive
+
+# Ensure Cassandra schema matches pipeline contract
+.\scripts\ensure-cassandra-schema.ps1
+
+# Submit all 3 Flink jobs (includes schema preflight)
+.\scripts\submit-flink-jobs.ps1
+
+# End-to-end pipeline verification
+.\scripts\verify-flink-jobs.ps1
 ```
 
 ### Health Verification Commands
@@ -156,6 +165,7 @@ These three sources MUST stay in sync for any constant change:
 - Preserve `adjacent_zones` column in zone_mapping.csv — required by Flink Job 3 trip matcher fallback
 - GPS anonymization in Flink Job 1: snap raw lat/lon to zone centroid before writing to Cassandra
 - Porto dataset replay at 10× speed, with ±20m GPS drift noise and 5% blackout probability
+- GPS event_time is rebased to current wall-clock time (not historical Porto timestamps) so Flink watermarks, Cassandra TTLs, and Grafana freshness all work in real-time
 
 ---
 
@@ -200,6 +210,9 @@ Taasimm/
 │       └── zone_data.py               ← Zone mapping helper (load, assign, validate)
 ├── scripts/
 │   ├── register-connectors.ps1        ← registers S3 Sink connectors via REST
+│   ├── submit-flink-jobs.ps1          ← submits all 3 PyFlink jobs with preflight checks
+│   ├── verify-flink-jobs.ps1          ← end-to-end pipeline verifier (Flink, Kafka lag, Cassandra)
+│   ├── ensure-cassandra-schema.ps1    ← idempotent Cassandra schema migration guard
 │   ├── verify-cassandra.ps1           ← Cassandra schema test (INSERT + SELECT)
 │   └── test_late_events.py            ← Watermark late event test
 ├── documents/                         ← task status documentation
