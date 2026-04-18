@@ -14,7 +14,7 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 |-------|-----------|---------|
 | Event bus | Kafka 3.7.0 (KRaft, 1 broker) | Streams GPS + trip events, 7-day retention, 4 partitions default |
 | Event archival | Kafka Connect (cp-kafka-connect:7.6.0) | S3 Sink: mirrors `raw.gps` + `raw.trips` → MinIO `kafka-archive/` |
-| Object store | MinIO (S3-compatible) | Data lake: `raw/`, `curated/`, `ml/`, `kafka-archive/` |
+| Object store | MinIO (S3-compatible) | Data lake: `raw/`, `curated/`, `mldata/`, `kafka-archive/` |
 | Stream processing | Flink 1.18 (1 JM + 1 TM, 4 slots) | 3 jobs: GPS normalizer, demand aggregator, trip matcher |
 | Batch + ML | Spark 3.5.4 (PySpark) | ETL on Porto/NYC data, GBT demand forecasting (MLlib) |
 | Serving DB | Cassandra 4.1 | 3 tables: `vehicle_positions`, `trips`, `demand_zones` |
@@ -55,8 +55,8 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | `raw/kafka-archive/` | Kafka S3 Sink mirror | Kafka Connect | Spark ETL |
 | `curated/trips/` | Cleaned geo-enriched trips (Parquet) | Spark ETL | Spark ML |
 | `curated/flink-checkpoints/` | Flink checkpoint data | Flink | Flink |
-| `ml/features/` | Feature matrix for ML training | Spark | Spark MLlib |
-| `ml/models/demand_v1/` | Trained GBT model (PipelineModel) | Spark ML | FastAPI |
+| `mldata/features/` | Feature matrix for ML training | Spark | Spark MLlib |
+| `mldata/models/demand_v1/` | Trained GBT model (PipelineModel) | Spark ML | FastAPI |
 
 ---
 
@@ -287,7 +287,7 @@ Taasimm/
 | Baseline | Naive 7-day-lag (must beat this) |
 | Features | hour, day_of_week, is_weekend, zone_id, population_density, is_raining, demand_lag_1d/7d, rolling_7d_mean |
 | API | `POST /api/demand/forecast` → `{zone_id, datetime}` → `{predicted_demand}` |
-| Artifact path | `s3a://ml/models/demand_v1/` |
+| Artifact path | `s3a://mldata/models/demand_v1/` |
 
 ---
 

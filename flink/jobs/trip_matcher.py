@@ -35,7 +35,6 @@ from pyflink.datastream.connectors.kafka import (
 )
 
 from cassandra.cluster import Cluster
-from cassandra.policies import DCAwareRoundRobinPolicy
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TripMatcher")
@@ -60,9 +59,10 @@ class TripTimestampAssigner:
     def extract_timestamp(self, value, record_timestamp):
         try:
             event = json.loads(value)
-            requested_at = event.get("requested_at", "")
-            if requested_at:
-                dt = datetime.fromisoformat(requested_at.replace("Z", "+00:00"))
+            # event_time is ISO-8601 UTC string (canonical field, renamed from requested_at)
+            event_time = event.get("event_time", "")
+            if event_time:
+                dt = datetime.fromisoformat(event_time.replace("Z", "+00:00"))
                 return int(dt.timestamp() * 1000)
         except Exception:
             pass
@@ -73,9 +73,14 @@ class GpsTimestampAssigner:
     def extract_timestamp(self, value, record_timestamp):
         try:
             event = json.loads(value)
-            return int(event.get("timestamp", 0)) * 1000
+            # event_time is ISO-8601 UTC string from processed.gps
+            event_time = event.get("event_time", "")
+            if event_time:
+                dt = datetime.fromisoformat(event_time.replace("Z", "+00:00"))
+                return int(dt.timestamp() * 1000)
         except Exception:
-            return record_timestamp
+            pass
+        return record_timestamp
 
 
 class TripMatcherFunction(KeyedProcessFunction):
@@ -130,24 +135,26 @@ class TripMatcherFunction(KeyedProcessFunction):
         self._vehicles = runtime_context.get_map_state(vehicle_desc)
 
         # Cassandra connection
+        self._connect_cassandra()
+
+    def _connect_cassandra(self):
+        """Connect (or reconnect) to Cassandra using the default LBP so the driver
+        auto-detects the DC name — avoids hardcoding dc1 vs datacenter1."""
         try:
-            cluster = Cluster(
-                [CASSANDRA_HOST],
-                load_balancing_policy=DCAwareRoundRobinPolicy(local_dc="datacenter1"),
-                protocol_version=4,
-            )
+            cluster = Cluster([CASSANDRA_HOST], protocol_version=4)
             self._cassandra_session = cluster.connect("taasim")
             self._trip_insert_stmt = self._cassandra_session.prepare(
                 """
                 INSERT INTO trips
                     (city, date_bucket, created_at, trip_id, rider_id, taxi_id,
-                     origin_zone, dest_zone, status, fare, eta_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     origin_zone, dest_zone, status, fare, eta_seconds, origin_h3, dest_h3)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
             )
             logger.info("Cassandra connected in TripMatcherFunction")
         except Exception as e:
             logger.error(f"Cassandra connect failed: {e}")
+            self._cassandra_session = None
 
     def process_element(self, value, ctx: KeyedProcessFunction.Context):
         try:
@@ -160,14 +167,13 @@ class TripMatcherFunction(KeyedProcessFunction):
         event_type = event.get("_type", "gps")
 
         if event_type == "gps":
-            # Store vehicle state
+            # Store vehicle state — use centroid_lat/centroid_lon from processed.gps
             taxi_id = event.get("taxi_id", "")
             if taxi_id:
                 vehicle_data = json.dumps({
-                    "lat": event.get("lat", 0),
-                    "lon": event.get("lon", 0),
+                    "lat": event.get("centroid_lat", event.get("lat", 0)),
+                    "lon": event.get("centroid_lon", event.get("lon", 0)),
                     "speed_kmh": event.get("speed_kmh", 0),
-                    "ts": event.get("timestamp", 0),
                 })
                 self._vehicles.put(taxi_id, vehicle_data)
 
@@ -244,6 +250,8 @@ class TripMatcherFunction(KeyedProcessFunction):
 
     def _write_match(self, event, taxi_id, zone_id, eta_seconds, fare):
         if not self._cassandra_session:
+            self._connect_cassandra()
+        if not self._cassandra_session:
             return
         try:
             now = datetime.now(timezone.utc)
@@ -261,12 +269,16 @@ class TripMatcherFunction(KeyedProcessFunction):
                     "matched",
                     float(fare),
                     int(eta_seconds),
+                    event.get("origin_h3"),
+                    event.get("dest_h3"),
                 )
             )
         except Exception as e:
             logger.error(f"Cassandra trip write failed: {e}")
 
     def _write_unmatched(self, event, zone_id):
+        if not self._cassandra_session:
+            self._connect_cassandra()
         if not self._cassandra_session:
             return
         try:
@@ -285,6 +297,8 @@ class TripMatcherFunction(KeyedProcessFunction):
                     "no_vehicle",
                     0.0,
                     0,
+                    event.get("origin_h3"),
+                    event.get("dest_h3"),
                 )
             )
         except Exception as e:

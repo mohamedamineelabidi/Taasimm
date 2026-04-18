@@ -1,0 +1,40 @@
+{
+  "name": "taasim-s3-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.s3.S3SinkConnector",
+    "tasks.max": "1",
+    "topics": "raw.gps,raw.trips",
+
+    "s3.region": "us-east-1",
+    "s3.bucket.name": "kafka-archive",
+    "s3.part.size": "5242880",
+    "store.url": "http://minio:9000",
+
+    "aws.access.key.id": "minioadmin",
+    "aws.secret.access.key": "minioadmin",
+
+    "storage.class": "io.confluent.connect.s3.storage.S3Storage",
+    "format.class": "io.confluent.connect.s3.format.json.JsonFormat",
+
+    "flush.size": "100",
+    "rotate.interval.ms": "30000",
+    "rotate.schedule.interval.ms": "60000",
+
+    "locale": "en_US",
+    "timezone": "UTC",
+    "timestamp.extractor": "RecordField",
+    "timestamp.field": "event_time",
+    "path.format": "'year'=YYYY/'month'=MM/'day'=dd/'hour'=HH",
+    "topics.dir": "raw",
+
+    "schema.compatibility": "NONE",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "errors.tolerance": "all",
+    "errors.deadletterqueue.topic.name": "_s3-sink-dlq",
+    "errors.deadletterqueue.topic.replication.factor": "1",
+    "errors.deadletterqueue.context.headers.enable": "true"
+  }
+}

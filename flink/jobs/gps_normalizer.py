@@ -45,8 +45,11 @@ class GpsTimestampAssigner(TimestampAssigner):
     def extract_timestamp(self, value, record_timestamp):
         try:
             data = json.loads(value)
-            return int(data["timestamp"]) * 1000  # Convert to millis
-        except (json.JSONDecodeError, KeyError, TypeError):
+            # event_time is ISO-8601 UTC string (canonical field)
+            return int(datetime.fromisoformat(
+                data["event_time"].replace("Z", "+00:00")
+            ).timestamp() * 1000)
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             return record_timestamp
 
 
@@ -57,8 +60,7 @@ class GpsProcessor(MapFunction):
 
     def open(self, runtime_context: RuntimeContext):
         import csv
-        import h3 as _h3
-        self._h3 = _h3
+        # H3 is pre-computed by producer — no need to import h3 here
         CASA_LAT_MIN, CASA_LAT_MAX = 33.450, 33.680
         CASA_LON_MIN, CASA_LON_MAX = -7.720, -7.480
         self._bounds = (CASA_LAT_MIN, CASA_LAT_MAX, CASA_LON_MIN, CASA_LON_MAX)
@@ -112,11 +114,10 @@ class GpsProcessor(MapFunction):
         speed = data.get("speed_kmh", 0.0)
         taxi_id = data.get("taxi_id", "unknown")
         status = data.get("status", "unknown")
-        timestamp = data.get("timestamp")
-        snapped_valid = data.get("snapped_valid", True)
+        event_time_str = data.get("event_time")
         snap_dist_m = data.get("snap_dist_m")
 
-        if lat is None or lon is None or timestamp is None:
+        if lat is None or lon is None or event_time_str is None:
             return None
 
         # Validate coordinates and speed (inlined is_valid_gps)
@@ -125,25 +126,16 @@ class GpsProcessor(MapFunction):
             return None
         if speed is not None and speed > 150.0:
             return None
-        # Strict runtime guard aligned with notebook filtering
-        if not snapped_valid:
-            return None
         if snap_dist_m is not None and float(snap_dist_m) > 333.0:
             return None
 
-        # Assign zone via H3 O(1) lookup (replaces bbox loop)
-        cell = self._h3.latlng_to_cell(lat, lon, 9)
+        # Trust producer's pre-computed H3 cell — no recomputation (P2 fix)
+        cell = data.get("h3_index")
+        if not cell:
+            return None
         zone_id = None
         if cell in self.h3_lookup:
             zone_id = self.h3_lookup[cell]["zone_id"]
-        else:
-            for ring in range(1, 6):
-                for neighbor in self._h3.grid_ring(cell, ring):
-                    if neighbor in self.h3_lookup:
-                        zone_id = self.h3_lookup[neighbor]["zone_id"]
-                        break
-                if zone_id is not None:
-                    break
         if zone_id is None:
             return None
 
@@ -153,8 +145,11 @@ class GpsProcessor(MapFunction):
             return None
         centroid_lat, centroid_lon = centroid
 
-        # Convert timestamp to datetime for Cassandra
-        event_time = datetime.utcfromtimestamp(int(timestamp))
+        # Parse canonical event_time ISO string
+        try:
+            event_time = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
         # Write to Cassandra (anonymized: centroid coordinates)
         try:
@@ -167,16 +162,16 @@ class GpsProcessor(MapFunction):
             logger.error(f"Cassandra write error: {e}")
 
         # Build output record for processed.gps Kafka topic
+        # lat/lon are centroid values (anonymized) — named explicitly
         output = {
             "taxi_id": taxi_id,
             "zone_id": zone_id,
             "h3_index": cell,
-            "event_time": event_time.isoformat() + "Z",
-            "lat": centroid_lat,
-            "lon": centroid_lon,
+            "event_time": event_time_str,  # pass through ISO string unchanged
+            "centroid_lat": centroid_lat,
+            "centroid_lon": centroid_lon,
             "speed_kmh": speed,
             "status": status,
-            "timestamp": int(timestamp),
         }
         return json.dumps(output)
 
