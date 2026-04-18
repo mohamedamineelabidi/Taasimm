@@ -20,10 +20,10 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Serving DB | Cassandra 4.1 | 3 tables: `vehicle_positions`, `trips`, `demand_zones` |
 | Dashboard | Grafana 10.4.0 | Vehicle map, demand heatmap, KPI panels, ML forecast overlay |
 | API | FastAPI (Python) | REST: trip reservation, vehicle lookup, demand forecast. JWT auth. |
-| Notebooks | Jupyter (pyspark-notebook) | EDA and zone remapping analysis |
+| Notebooks | VS Code (local Jupyter) | EDA and zone remapping analysis |
 
 ### Source-of-Truth Files
-- `docker-compose.yml` — all 14 container definitions (Kafka, Kafka Connect, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, Jupyter, GPS producer, Trip producer)
+- `docker-compose.yml` — all container definitions (Kafka, Kafka Connect, Kafka UI, MinIO, minio-init, Cassandra, cassandra-init, Flink JM, Flink TM, Spark master, Spark worker, Grafana, GPS producer, Trip producer)
 - `config/cassandra-init.cql` — keyspace `taasim` + 3 tables with partition key justification
 - `config/connect-s3-sink-gps.json` — S3 Sink connector config for `raw.gps` topic
 - `config/connect-s3-sink-trips.json` — S3 Sink connector config for `raw.trips` topic
@@ -88,7 +88,6 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Spark App UI | `localhost:4040` | — |
 | Kafka Connect REST | `localhost:8083` | — |
 | Grafana | `localhost:3000` | admin / admin |
-| Jupyter Lab | `localhost:8888` | token from logs |
 
 ### Smoke Tests
 ```powershell

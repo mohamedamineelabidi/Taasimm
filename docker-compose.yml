@@ -406,9 +406,6 @@ services:
       - taasim-net
 
   # ──────────────────────────────────────────────
-  # 8. JUPYTER — Notebook environment for EDA
-  # ──────────────────────────────────────────────
-  # ──────────────────────────────────────────────
   # 8. KAFKA UI — Browse topics, messages, consumer groups
   # ──────────────────────────────────────────────
   kafka-ui:
@@ -434,27 +431,4 @@ services:
       retries: 5
       start_period: 20s
 
-  # ──────────────────────────────────────────────
-  # 9. JUPYTER — Notebook environment for EDA
-  # ──────────────────────────────────────────────
-  jupyter:
-    image: jupyter/pyspark-notebook:latest
-    container_name: taasim-jupyter
-    hostname: jupyter
-    ports:
-      - "8888:8888"
-    environment:
-      JUPYTER_ENABLE_LAB: "yes"
-      PYSPARK_DRIVER_PYTHON: jupyter
-      PYSPARK_DRIVER_PYTHON_OPTS: "lab"
-      SPARK_MASTER: spark://spark-master:7077
-    volumes:
-      - ./notebooks:/home/jovyan/notebooks
-      - ./data:/home/jovyan/data
-      - ./config/spark-defaults.conf:/home/jovyan/spark-defaults.conf
-      - ./jars/spark:/home/jovyan/extra-jars
-    networks:
-      - taasim-net
-    depends_on:
-      spark-master:
-        condition: service_healthy
+
