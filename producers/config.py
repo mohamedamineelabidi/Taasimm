@@ -133,9 +133,14 @@ _h3_lookup_cache = None
 
 
 def load_road_tree():
-    """Load KDTree of Casablanca road nodes for snap_to_road(). Cached after first call."""
+    """Load KDTree of Casablanca road nodes for snap_to_road(). Cached after first call.
+    Returns (None, None) if casablanca_road_nodes.npy has not been generated yet.
+    Run notebooks/03_h3_zone_remapping.ipynb to generate it.
+    """
     global _road_tree, _road_arr
     if _road_tree is None:
+        if not os.path.exists(ROAD_NODES_PATH):
+            return None, None
         from scipy.spatial import cKDTree
         _road_arr = np.load(ROAD_NODES_PATH)
         _road_tree = cKDTree(_road_arr)
@@ -156,8 +161,12 @@ def snap_to_road(lat, lon, h3_lookup=None, max_dist_deg=0.003):
     Returns (snapped_lat, snapped_lon, snap_dist_m, snapped_valid).
     - max_dist_deg=0.003 (~333m), aligned with notebook strict filtering.
     - snapped_valid=False when point is too far from roads or outside land zones.
+    - Falls back to (lat, lon, 0.0, True) when road nodes file is unavailable.
     """
     tree, arr = load_road_tree()
+    if tree is None:
+        # Road nodes not generated yet — pass through without snapping
+        return lat, lon, 0.0, True
     dist, idx = tree.query([lat, lon])
     snap_dist_m = float(dist * 111_000)
     if dist > max_dist_deg:
