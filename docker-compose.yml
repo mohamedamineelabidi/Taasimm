@@ -121,7 +121,6 @@ services:
       - "9042:9042"
     environment:
       CASSANDRA_CLUSTER_NAME: TaaSimCluster
-      CASSANDRA_DC: dc1
       CASSANDRA_RACK: rack1
       MAX_HEAP_SIZE: 512M
       HEAP_NEWSIZE: 128M
@@ -229,7 +228,7 @@ services:
     hostname: gps-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "vehicle_gps_producer.py", "--max-trips", "200", "--speed", "10"]
+    command: ["python", "vehicle_gps_producer.py", "--speed", "10"]
     volumes:
       - ./data:/data
     depends_on:
@@ -245,7 +244,7 @@ services:
     hostname: trip-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "trip_request_producer.py", "--max-trips", "500", "--base-rate", "2.0"]
+    command: ["python", "trip_request_producer.py", "--base-rate", "2.0"]
     volumes:
       - ./data:/data
     depends_on:
