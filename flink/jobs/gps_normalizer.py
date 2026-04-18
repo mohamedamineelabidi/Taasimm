@@ -156,7 +156,7 @@ class GpsDeduplicator(KeyedProcessFunction):
         b = self._bounds
         if not (b[0] <= lat <= b[1] and b[2] <= lon <= b[3]):
             return
-        if speed is not None and speed > 150.0:
+        if speed is not None and (speed < 0 or speed > 150.0):
             return
         if snap_dist_m is not None and float(snap_dist_m) > 333.0:
             return
@@ -183,9 +183,9 @@ class GpsDeduplicator(KeyedProcessFunction):
         except ValueError:
             return
 
-        # Write to Cassandra
+        # Write to Cassandra (async — high throughput path)
         try:
-            self.session.execute(
+            self.session.execute_async(
                 self.insert_stmt,
                 ("casablanca", zone_id, event_time, taxi_id,
                  centroid_lat, centroid_lon, speed, status, cell)
@@ -245,7 +245,7 @@ def main():
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics(INPUT_TOPIC)
         .set_group_id("flink-gps-normalizer")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )
