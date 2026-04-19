@@ -9,7 +9,8 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - Week 2 / Sprint 2: COMPLETED
 - Week 3 / Sprint 3: COMPLETED
 - Week 5 / Spark ETL: COMPLETED
-- Currently targeting: Week 6 (ML feature engineering + GBT model)
+- Week 6 / ML Pipeline: COMPLETED
+- Currently targeting: Week 7 (Security, integration tests, SLA)
 
 ## Task Board — Week 1
 
@@ -38,6 +39,12 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [x] Task 2: NYC TLC ETL — 9.38M raw → 8.81M cleaned → 192K demand agg rows (4.3 MiB)
 - [x] Task 3: KPI Analytics — 6 datasets: trips_per_zone, hourly_demand, daily_pattern, zone_hour_heatmap, coverage_gaps, call_type_breakdown
 
+## Task Board — Week 6 (ML Pipeline)
+
+- [x] Task 1: Feature Engineering — 183,981 feature rows (30-min slots, lag features, rolling means)
+- [x] Task 2: GBT Model Training — RMSE 3.71, R² 0.75, 45.8% improvement over naive baseline
+- [x] Task 3: FastAPI REST API — JWT auth, demand forecast, trip reservation, zone lookup
+
 ## Evidence Files
 
 - [01_task_docker_stack.md](01_task_docker_stack.md)
@@ -48,6 +55,7 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [06_next_steps.md](06_next_steps.md)
 - [07_adr_v1.md](07_adr_v1.md)
 - [08_week3_completion.md](08_week3_completion.md) ← Week 3 Verification Report
+- [10_week6_ml_pipeline.md](10_week6_ml_pipeline.md) ← Week 6 ML Pipeline Report
 - [09_week5_spark_etl.md](09_week5_spark_etl.md) ← Week 5 Spark ETL Report
 
 ## Current State Summary

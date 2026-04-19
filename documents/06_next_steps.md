@@ -2,14 +2,13 @@
 
 Last updated: 2026-04-19
 
-## Immediate Next Steps (Week 6 — ML)
+## Immediate Next Steps (Week 7 — Security & Integration)
 
-1. Feature engineering: build feature matrix from curated Porto trips (lag features, rolling averages, temporal features)
-2. GBT model training: GBTRegressor (MLlib) — demand per zone per 30-min slot
-3. Temporal train/test split: 10 months training, 2 months test
-4. Naive baseline: 7-day-lag comparison (must beat this)
-5. FastAPI forecast endpoint: POST /api/demand/forecast
-6. Model artifact saved to s3a://mldata/models/demand_v1/
+1. JWT auth hardening: rotate secrets, HTTPS/TLS for API
+2. GPS anonymization audit: verify centroid snapping in Flink Job 1
+3. Integration test: end-to-end pipeline (producer → Flink → Cassandra → API)
+4. SLA measurement: trip match <5s P95, GPS freshness <15s, API <500ms at 20 req/s
+5. Checkpoint recovery test: kill Flink TM, verify resume from checkpoint
 
 ## Pending Verifications
 
@@ -20,6 +19,7 @@ Last updated: 2026-04-19
 
 ## Update Log
 
+- 2026-04-19: Week 6 ML Pipeline complete — Feature engineering (183,981 rows), GBT model (RMSE 3.71, R² 0.75, 45.8% improvement), FastAPI API with JWT auth. Model saved to s3a://mldata/models/demand_v1/. Docker: added taasim-api service + numpy persistence. Evidence: 10_week6_ml_pipeline.md.
 - 2026-04-19: Week 5 Spark ETL complete — Porto ETL (43 MiB, 12 partitions), NYC ETL (4.3 MiB, 192K demand rows), KPI Analytics (6 datasets). All outputs verified in MinIO curated/. Docker RAM upgraded (worker 4g, master 3g limit). Evidence doc: 09_week5_spark_etl.md.
 - 2026-04-17: Week 3 complete — All 3 Flink jobs deployed and running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand Aggregator + Trip Matcher operational. Kafka UI added. Data flow verified end-to-end. Created verification evidence doc (08_week3_completion.md).
 - 2026-04-17: Flink Job 2 (Demand Aggregator) deployed: processes.gps + raw.trips → 30s tumbling windows → demand_zones Cassandra + processed.demand topic.

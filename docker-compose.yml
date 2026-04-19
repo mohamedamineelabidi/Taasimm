@@ -266,7 +266,9 @@ services:
       - "7077:7077"   # Spark master port
       - "4040:4040"   # Spark application UI
     user: root
-    command: /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080
+    command: >
+      /bin/bash -c "pip install --quiet numpy &&
+      /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080"
     environment:
       SPARK_NO_DAEMONIZE: "true"
       SPARK_MASTER_HOST: spark-master
@@ -298,7 +300,9 @@ services:
     container_name: taasim-spark-worker
     hostname: spark-worker
     user: root
-    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 4g --cores 2
+    command: >
+      /bin/bash -c "pip install --quiet numpy &&
+      /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 4g --cores 2"
     environment:
       SPARK_NO_DAEMONIZE: "true"
       SPARK_WORKER_MEMORY: 4g
@@ -426,7 +430,35 @@ services:
       - taasim-net
 
   # ──────────────────────────────────────────────
-  # 8. KAFKA UI — Browse topics, messages, consumer groups
+  # 8. API — FastAPI demand forecast + trip reservation
+  # ──────────────────────────────────────────────
+  api:
+    build: ./api
+    container_name: taasim-api
+    hostname: api
+    ports:
+      - "8000:8000"
+    environment:
+      MINIO_ENDPOINT: "http://minio:9000"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MODEL_PATH: "s3a://mldata/models/demand_v1/"
+      CASSANDRA_HOST: cassandra
+      JWT_SECRET: "taasim-secret-key-change-in-production"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # 9. KAFKA UI — Browse topics, messages, consumer groups
   # ──────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
