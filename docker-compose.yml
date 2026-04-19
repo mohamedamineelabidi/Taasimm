@@ -273,6 +273,7 @@ services:
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra
+      - ./spark:/opt/spark-jobs
       - ./notebooks:/opt/notebooks
       - ./scripts:/opt/scripts
       - ./data:/opt/data
@@ -298,6 +299,7 @@ services:
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra
+      - ./spark:/opt/spark-jobs
       - ./notebooks:/opt/notebooks
       - ./scripts:/opt/scripts
       - ./data:/opt/data

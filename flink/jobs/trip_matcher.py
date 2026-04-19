@@ -148,8 +148,9 @@ class TripMatcherFunction(KeyedProcessFunction):
                 """
                 INSERT INTO trips
                     (city, date_bucket, created_at, trip_id, rider_id, taxi_id,
-                     origin_zone, dest_zone, status, fare, eta_seconds, origin_h3, dest_h3)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     origin_zone, dest_zone, status, fare, eta_seconds,
+                     origin_h3, dest_h3, origin_lat, origin_lon, dest_lat, dest_lon)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 IF NOT EXISTS
                 """
             )
@@ -297,6 +298,10 @@ class TripMatcherFunction(KeyedProcessFunction):
                     int(eta_seconds),
                     event.get("origin_h3"),
                     event.get("dest_h3"),
+                    float(event.get("origin_lat", 0)),
+                    float(event.get("origin_lon", 0)),
+                    float(event.get("dest_lat", 0)),
+                    float(event.get("dest_lon", 0)),
                 )
             )
         except Exception as e:
@@ -331,6 +336,10 @@ class TripMatcherFunction(KeyedProcessFunction):
                     0,
                     event.get("origin_h3"),
                     event.get("dest_h3"),
+                    float(event.get("origin_lat", 0)),
+                    float(event.get("origin_lon", 0)),
+                    float(event.get("dest_lat", 0)),
+                    float(event.get("dest_lon", 0)),
                 )
             )
         except Exception as e:

@@ -1,21 +1,24 @@
-"""Diagnostic script: analyze current zone distribution and test candidate configs."""
+"""Diagnostic script: analyze current zone distribution and test candidate configs.
+
+Imports transform constants from producers/config.py (single source of truth).
+"""
+import sys
+import os
 import numpy as np
 import csv
 import json
 
-# Load zone mapping (pure CSV, no pandas)
-zones = []
-with open("data/zone_mapping.csv") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        zones.append({
-            "zone_id": int(row["zone_id"]),
-            "name": row["arrondissement_name"],
-            "lat_min": float(row["casa_lat_min"]),
-            "lat_max": float(row["casa_lat_max"]),
-            "lon_min": float(row["casa_lon_min"]),
-            "lon_max": float(row["casa_lon_max"]),
-        })
+# Ensure producers package is importable from scripts/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from producers.config import (
+    PORTO_LAT_MIN, PORTO_LAT_MAX, PORTO_LON_MIN, PORTO_LON_MAX,
+    PORTO_METRO_LAT, PORTO_METRO_LON,
+    CASA_LAT_MIN, CASA_LAT_MAX, CASA_LON_MIN, CASA_LON_MAX,
+    PORTO_CSV_PATH, ZONE_MAPPING_PATH,
+    transform_coord, load_zone_mapping, is_in_porto_metro,
+)
+
+zones = load_zone_mapping()
 
 print("=== CURRENT ZONE BOUNDARIES ===")
 for z in zones:
@@ -29,7 +32,7 @@ print("\n=== LOADING PORTO DATA (first 100K rows) ===")
 olats = []
 olons = []
 count = 0
-with open("data/train.csv", encoding="utf-8") as f:
+with open(PORTO_CSV_PATH, encoding="utf-8") as f:
     reader = csv.DictReader(f)
     for row in reader:
         count += 1
@@ -41,8 +44,7 @@ with open("data/train.csv", encoding="utf-8") as f:
             coords = json.loads(row["POLYLINE"])
             if len(coords) >= 2:
                 lat, lon = coords[0][1], coords[0][0]
-                # Filter to Porto metro
-                if 41.10 <= lat <= 41.25 and -8.72 <= lon <= -8.55:
+                if is_in_porto_metro(lat, lon):
                     olats.append(lat)
                     olons.append(lon)
         except:
@@ -59,20 +61,20 @@ print(f"  Mean={np.mean(lats):.4f}  Std={np.std(lats):.4f}")
 
 
 def tx(val, smin, smax, dmin, dmax):
-    r = np.clip((val - smin) / (smax - smin), 0, 1)
-    return r * (dmax - dmin) + dmin
+    """Wrapper around config.transform_coord for vectorized use."""
+    return transform_coord(val, smin, smax, dmin, dmax)
 
 
-# Current distribution per band
-print("\n=== CURRENT CONFIG (Porto .085-.195, std bands) ===")
-casa_lats = tx(lats, 41.085, 41.195, 33.45, 33.68)
-casa_lons = tx(lons, -8.690, -8.560, -7.720, -7.480)
+# Current distribution per band (using active config constants)
+print(f"\n=== CURRENT CONFIG (Porto {PORTO_LAT_MIN:.3f}-{PORTO_LAT_MAX:.3f}) ===")
+casa_lats = tx(lats, PORTO_LAT_MIN, PORTO_LAT_MAX, CASA_LAT_MIN, CASA_LAT_MAX)
+casa_lons = tx(lons, PORTO_LON_MIN, PORTO_LON_MAX, CASA_LON_MIN, CASA_LON_MAX)
 bands = [("South", 33.45, 33.52), ("Mid-S", 33.52, 33.57),
          ("Center", 33.57, 33.62), ("North", 33.62, 33.68)]
 for name, bmin, bmax in bands:
     n = np.sum((casa_lats >= bmin) & (casa_lats < bmax))
     print(f"  {name:8s}: {n:6d} ({n / len(lats) * 100:5.1f}%)")
-clamp = np.sum((lats < 41.085) | (lats > 41.195))
+clamp = np.sum((lats < PORTO_LAT_MIN) | (lats > PORTO_LAT_MAX))
 print(f"  Clamped:  {clamp:6d} ({clamp / len(lats) * 100:.1f}%)")
 
 # Per-zone assignment with current config
@@ -104,7 +106,7 @@ header = f"{'Config':25s}  {'South':>6s} {'Mid-S':>6s} {'Centr':>6s} {'North':>6
 print(header)
 print("-" * len(header))
 cfgs = [
-    ("CURRENT .085-.195 std", 41.085, 41.195, [(33.45, 33.52), (33.52, 33.57), (33.57, 33.62), (33.62, 33.68)]),
+    (f"CURRENT {PORTO_LAT_MIN:.3f}-{PORTO_LAT_MAX:.3f}", PORTO_LAT_MIN, PORTO_LAT_MAX, [(33.45, 33.52), (33.52, 33.57), (33.57, 33.62), (33.62, 33.68)]),
     ("A .137-.174 std      ", 41.137, 41.174, [(33.45, 33.52), (33.52, 33.57), (33.57, 33.62), (33.62, 33.68)]),
     ("B .136-.176 adj      ", 41.136, 41.176, [(33.45, 33.525), (33.525, 33.575), (33.575, 33.625), (33.625, 33.68)]),
     ("C .138-.172 adj      ", 41.138, 41.172, [(33.45, 33.525), (33.525, 33.575), (33.575, 33.625), (33.625, 33.68)]),

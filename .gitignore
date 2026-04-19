@@ -16,6 +16,8 @@ cache/
 data/train.csv
 data/nyc-tlc/
 data/remapped_trips_sample.csv
+data/curated_trajectories.parquet
+data/.projector_checkpoint.json
 
 # JARs (downloaded via scripts, not tracked)
 jars/
