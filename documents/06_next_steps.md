@@ -1,15 +1,15 @@
 # Next Steps and Update Log
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
-## Immediate Next Steps (Week 4)
+## Immediate Next Steps (Week 6 — ML)
 
-1. Verify Cassandra data population from Flink jobs (check vehicle_positions, demand_zones, trips tables)
-2. Test trip matching latency: request submission → Cassandra write < 5s P95
-3. Enhance Grafana: demand zone heatmap + trip match KPIs
-4. Spark ETL: Porto (1.8 GiB) + NYC (150 MiB) batch processing
-5. Feature engineering for ML: lag features, rolling averages, weather correlation
-6. Run full E2E integration test: 500+ trips, 5+ hour replay, measure SLAs
+1. Feature engineering: build feature matrix from curated Porto trips (lag features, rolling averages, temporal features)
+2. GBT model training: GBTRegressor (MLlib) — demand per zone per 30-min slot
+3. Temporal train/test split: 10 months training, 2 months test
+4. Naive baseline: 7-day-lag comparison (must beat this)
+5. FastAPI forecast endpoint: POST /api/demand/forecast
+6. Model artifact saved to s3a://mldata/models/demand_v1/
 
 ## Pending Verifications
 
@@ -20,6 +20,7 @@ Last updated: 2026-04-17
 
 ## Update Log
 
+- 2026-04-19: Week 5 Spark ETL complete — Porto ETL (43 MiB, 12 partitions), NYC ETL (4.3 MiB, 192K demand rows), KPI Analytics (6 datasets). All outputs verified in MinIO curated/. Docker RAM upgraded (worker 4g, master 3g limit). Evidence doc: 09_week5_spark_etl.md.
 - 2026-04-17: Week 3 complete — All 3 Flink jobs deployed and running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand Aggregator + Trip Matcher operational. Kafka UI added. Data flow verified end-to-end. Created verification evidence doc (08_week3_completion.md).
 - 2026-04-17: Flink Job 2 (Demand Aggregator) deployed: processes.gps + raw.trips → 30s tumbling windows → demand_zones Cassandra + processed.demand topic.
 - 2026-04-17: Flink Job 3 (Trip Matcher) deployed: raw.trips + processed.gps → nearest vehicle matching → trips Cassandra + processed.matches topic.

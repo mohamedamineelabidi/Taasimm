@@ -1,6 +1,6 @@
 # TaaSim Project Master Status
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 Project: TaaSim (Transport as a Service) - Casablanca
 
 ## Global Progress
@@ -8,7 +8,8 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - Week 1 / Sprint 1: COMPLETED
 - Week 2 / Sprint 2: COMPLETED
 - Week 3 / Sprint 3: COMPLETED
-- Currently targeting: Week 4 (Spark ETL + Enhanced Flink Job 2 & 3)
+- Week 5 / Spark ETL: COMPLETED
+- Currently targeting: Week 6 (ML feature engineering + GBT model)
 
 ## Task Board — Week 1
 
@@ -31,6 +32,12 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [x] Task 3: Watermark test (late event test script, event-time watermarks with 3-min lateness)
 - [x] Task 4: Grafana vehicle map dashboard (Geomap + bar chart + table panels)
 
+## Task Board — Week 5 (Spark ETL)
+
+- [x] Task 1: Porto ETL — 1,710,670 raw → 1,660,794 valid trips, 12 Parquet partitions (43 MiB)
+- [x] Task 2: NYC TLC ETL — 9.38M raw → 8.81M cleaned → 192K demand agg rows (4.3 MiB)
+- [x] Task 3: KPI Analytics — 6 datasets: trips_per_zone, hourly_demand, daily_pattern, zone_hour_heatmap, coverage_gaps, call_type_breakdown
+
 ## Evidence Files
 
 - [01_task_docker_stack.md](01_task_docker_stack.md)
@@ -41,6 +48,7 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [06_next_steps.md](06_next_steps.md)
 - [07_adr_v1.md](07_adr_v1.md)
 - [08_week3_completion.md](08_week3_completion.md) ← Week 3 Verification Report
+- [09_week5_spark_etl.md](09_week5_spark_etl.md) ← Week 5 Spark ETL Report
 
 ## Current State Summary
 

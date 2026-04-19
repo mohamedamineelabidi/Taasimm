@@ -270,6 +270,13 @@ services:
     environment:
       SPARK_NO_DAEMONIZE: "true"
       SPARK_MASTER_HOST: spark-master
+      SPARK_DRIVER_MEMORY: 2g
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 1g
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra
@@ -291,11 +298,17 @@ services:
     container_name: taasim-spark-worker
     hostname: spark-worker
     user: root
-    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 2g --cores 2
+    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 4g --cores 2
     environment:
       SPARK_NO_DAEMONIZE: "true"
-      SPARK_WORKER_MEMORY: 2g
+      SPARK_WORKER_MEMORY: 4g
       SPARK_WORKER_CORES: 2
+    deploy:
+      resources:
+        limits:
+          memory: 5g
+        reservations:
+          memory: 2g
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra

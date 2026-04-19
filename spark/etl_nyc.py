@@ -16,7 +16,8 @@ Usage (inside Spark container):
 """
 
 import logging
-from pyspark.sql import SparkSession
+from functools import reduce
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import IntegerType, DoubleType
 
@@ -25,6 +26,39 @@ log = logging.getLogger("ETL-NYC")
 
 INPUT_PATH = "s3a://raw/nyc-tlc/"
 OUTPUT_PATH = "s3a://curated/nyc-demand/"
+
+# NYC TLC Parquet files to process
+NYC_FILES = [
+    "yellow_tripdata_2023-01.parquet",
+    "yellow_tripdata_2023-02.parquet",
+    "yellow_tripdata_2023-03.parquet",
+]
+
+# Common column names — cast to widest compatible types
+# Handles: VendorID (INT vs BIGINT), passenger_count (DOUBLE vs INT64),
+#          RatecodeID (DOUBLE vs BIGINT), PULocationID (INT vs BIGINT),
+#          Airport_fee vs airport_fee (case drift)
+COMMON_COLS = [
+    ("VendorID", "long"),
+    ("tpep_pickup_datetime", None),
+    ("tpep_dropoff_datetime", None),
+    ("passenger_count", "long"),
+    ("trip_distance", "double"),
+    ("RatecodeID", "long"),
+    ("store_and_fwd_flag", None),
+    ("PULocationID", "long"),
+    ("DOLocationID", "long"),
+    ("payment_type", "long"),
+    ("fare_amount", "double"),
+    ("extra", "double"),
+    ("mta_tax", "double"),
+    ("tip_amount", "double"),
+    ("tolls_amount", "double"),
+    ("improvement_surcharge", "double"),
+    ("total_amount", "double"),
+    ("congestion_surcharge", "double"),
+    ("airport_fee", "double"),
+]
 
 
 def build_spark():
@@ -37,16 +71,37 @@ def build_spark():
     )
 
 
+def read_and_normalize(spark, path):
+    """Read a single Parquet file and normalize column names/types."""
+    df = spark.read.parquet(path)
+    # Handle Airport_fee vs airport_fee column name drift
+    if "Airport_fee" in df.columns:
+        df = df.withColumnRenamed("Airport_fee", "airport_fee")
+    cols = []
+    for name, cast_type in COMMON_COLS:
+        c = F.col(name)
+        if cast_type:
+            c = c.cast(cast_type)
+        cols.append(c.alias(name))
+    return df.select(cols)
+
+
 def main():
     log.info("=== TaaSim NYC TLC ETL Starting ===")
     spark = build_spark()
     log.info("SparkSession created: %s", spark.sparkContext.applicationId)
 
-    # ── 1. Read NYC TLC Parquet ──────────────────────────────────────
-    log.info("Reading NYC TLC Parquet from %s", INPUT_PATH)
-    raw_df = spark.read.parquet(INPUT_PATH)
+    # ── 1. Read NYC TLC Parquet (per-file to handle schema drift) ────
+    log.info("Reading NYC TLC Parquet files from %s", INPUT_PATH)
+    dfs = []
+    for fname in NYC_FILES:
+        fpath = INPUT_PATH + fname
+        log.info("  Reading %s", fname)
+        dfs.append(read_and_normalize(spark, fpath))
+
+    raw_df = reduce(DataFrame.unionByName, dfs)
     raw_count = raw_df.count()
-    log.info("Raw rows: %d", raw_count)
+    log.info("Raw rows (all months): %d", raw_count)
 
     # Print schema for reference
     raw_df.printSchema()
