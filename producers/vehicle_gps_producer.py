@@ -1,18 +1,21 @@
 """
 TaaSim — Vehicle GPS Producer
 ================================
-Replays Porto taxi POLYLINE trajectories at configurable speed (default 10×),
-transforms coordinates to Casablanca bounding box, and publishes to Kafka
-topic ``raw.gps``.
+Replays taxi trajectories at configurable speed (default 10×) and publishes
+to Kafka topic ``raw.gps``.
+
+Modes:
+- **live** (default): Read Porto CSVs, apply linear bbox transform + noise + road snap
+- **curated**: Replay pre-projected road-matched trajectories from Parquet
 
 Features:
-- Porto outlier filter (only metro-area trips)
-- Linear bbox transform + Gaussian noise
+- Porto outlier filter (only metro-area trips) [live mode]
+- Road-constrained trajectories with map matching [curated mode]
 - 5% GPS blackout probability (60–180s delay → out-of-order events)
 - Kafka key = taxi_id (for partition affinity)
 
 Usage:
-    python vehicle_gps_producer.py [--max-trips 1000] [--speed 10]
+    python vehicle_gps_producer.py [--mode live|curated] [--max-trips 1000] [--speed 10]
 """
 
 import argparse
@@ -30,6 +33,7 @@ from config import (
     KAFKA_BOOTSTRAP,
     TOPIC_GPS,
     PORTO_CSV_PATH,
+    DATA_DIR,
     REPLAY_SPEED,
     BLACKOUT_PROB,
     BLACKOUT_DELAY,
@@ -198,11 +202,112 @@ def run(max_trips, speed):
              sent, trip_count, skipped, blackout_events)
 
 
+def run_curated(max_trips, speed, curated_path=None):
+    """Replay curated (pre-projected, road-matched) trajectories from Parquet."""
+    import os
+    import pandas as pd
+
+    path = curated_path or os.path.join(DATA_DIR, "curated_trajectories.parquet")
+    if not os.path.exists(path):
+        log.error("Curated trajectories not found: %s", path)
+        log.error("Run scripts/offline_projector.py first.")
+        sys.exit(1)
+
+    df = pd.read_parquet(path)
+    log.info("Loaded curated trajectories: %d rows from %s", len(df), path)
+
+    h3_lookup = load_h3_lookup()
+    producer = create_producer()
+    log.info("Connected to Kafka at %s", KAFKA_BOOTSTRAP)
+    log.info("Topic: %s | Speed: %dx | Mode: curated | Max trips: %s",
+             TOPIC_GPS, speed, max_trips or "unlimited")
+
+    sent = 0
+    blackout_events = 0
+    trip_count = 0
+    interval = 15.0 / speed
+
+    for trip_id, trip_df in df.groupby("trip_id", sort=False):
+        trip_df = trip_df.sort_values("seq")
+        taxi_id = f"taxi_{hash(trip_id) % 10000:04d}"
+        base_ts = int(time.time())
+
+        has_blackout = random.random() < BLACKOUT_PROB
+        blackout_delay = random.randint(*BLACKOUT_DELAY) if has_blackout else 0
+
+        prev_lat, prev_lon = None, None
+        points = trip_df.to_dict("records")
+        for i, pt in enumerate(points):
+            lat = pt["lat"]
+            lon = pt["lon"]
+            zone_id = pt["zone_id"]
+
+            if zone_id == 0:
+                continue
+
+            # Assign H3 cell
+            _, _, h3_cell = assign_h3_zone(lat, lon, h3_lookup)
+            event_ts = base_ts + pt.get("offset_s", i * 15)
+
+            speed_kmh = 0.0
+            if prev_lat is not None:
+                speed_kmh = compute_speed(prev_lat, prev_lon, lat, lon, 15)
+            prev_lat, prev_lon = lat, lon
+
+            status = pt.get("status", "moving")
+
+            event = {
+                "taxi_id": taxi_id,
+                "trip_id": str(trip_id),
+                "event_time": datetime.fromtimestamp(
+                    event_ts, tz=timezone.utc
+                ).isoformat(),
+                "lat": round(lat, 6),
+                "lon": round(lon, 6),
+                "speed_kmh": speed_kmh,
+                "status": status,
+                "h3_index": h3_cell,
+                "zone_id": zone_id,
+                "snap_dist_m": 0.0,
+            }
+
+            if has_blackout and i > 0:
+                time.sleep(blackout_delay / speed)
+                blackout_events += 1
+                has_blackout = False
+
+            producer.send(TOPIC_GPS, key=taxi_id, value=event)
+            sent += 1
+
+            if sent % 500 == 0:
+                log.info("Sent %d GPS events (%d trips, %d blackouts)",
+                         sent, trip_count, blackout_events)
+
+            time.sleep(interval)
+
+        trip_count += 1
+        if max_trips and trip_count >= max_trips:
+            break
+
+    producer.flush()
+    producer.close()
+    log.info("=== DONE === Sent %d events from %d curated trips (%d blackouts)",
+             sent, trip_count, blackout_events)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TaaSim Vehicle GPS Producer")
+    parser.add_argument("--mode", choices=["live", "curated"], default="live",
+                        help="Replay mode: live (Porto transform) or curated (pre-projected)")
     parser.add_argument("--max-trips", type=int, default=None,
                         help="Max number of trips to replay (default: all)")
     parser.add_argument("--speed", type=int, default=REPLAY_SPEED,
                         help=f"Replay speed multiplier (default: {REPLAY_SPEED})")
+    parser.add_argument("--curated-path", type=str, default=None,
+                        help="Path to curated Parquet file (default: data/curated_trajectories.parquet)")
     args = parser.parse_args()
-    run(args.max_trips, args.speed)
+
+    if args.mode == "curated":
+        run_curated(args.max_trips, args.speed, args.curated_path)
+    else:
+        run(args.max_trips, args.speed)

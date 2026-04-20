@@ -1,7 +1,8 @@
 """
 Flink Job 1 — GPS Normalizer
 Reads raw.gps from Kafka, validates coordinates, assigns zones,
-anonymizes lat/lon to H3 cell center
+anonymizes lat/lon to H3 cell center (~87m precision),
+writes to Cassandra + processed.gps Kafka topic.
 """
 
 import json
@@ -87,7 +88,6 @@ class GpsDeduplicator(KeyedProcessFunction):
         except Exception as e:
             logger.error(f"H3 lookup load failed: {e}")
         logger.info(f"Loaded {len(self.h3_lookup)} H3 cells")
-        
 
         # Initialize Cassandra connection
         from cassandra.cluster import Cluster
@@ -161,6 +161,7 @@ class GpsDeduplicator(KeyedProcessFunction):
         # Anonymize: snap to H3 cell center (~87m precision, res 9)
         import h3
         h3_lat, h3_lon = h3.cell_to_latlng(cell)
+        display_lat, display_lon = h3_lat, h3_lon
 
         # Parse canonical event_time
         try:
@@ -173,7 +174,7 @@ class GpsDeduplicator(KeyedProcessFunction):
             self.session.execute_async(
                 self.insert_stmt,
                 ("casablanca", zone_id, event_time, taxi_id,
-                 h3_lat, h3_lon, speed, status, cell)
+                 display_lat, display_lon, speed, status, cell)
             )
         except Exception as e:
             logger.error(f"Cassandra write error: {e}")
@@ -184,8 +185,8 @@ class GpsDeduplicator(KeyedProcessFunction):
             "zone_id": zone_id,
             "h3_index": cell,
             "event_time": event_time_str,
-            "lat": h3_lat,
-            "lon": h3_lon,
+            "lat": display_lat,
+            "lon": display_lon,
             "speed_kmh": speed,
             "status": status,
         }
