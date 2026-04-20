@@ -488,24 +488,14 @@
       },
       "targets": [
         {
-          "refId": "origins",
+          "refId": "A",
           "datasource": {
             "type": "hadesarchitect-cassandra-datasource",
             "uid": "cassandra-ds"
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 100"
-        },
-        {
-          "refId": "destinations",
-          "datasource": {
-            "type": "hadesarchitect-cassandra-datasource",
-            "uid": "cassandra-ds"
-          },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT trip_id, dest_lat, dest_lon, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 100"
+          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, origin_zone, dest_lat, dest_lon, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 100"
         }
       ],
       "options": {
@@ -1319,17 +1309,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-19' LIMIT 50"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "hadesarchitect-cassandra-datasource",
-            "uid": "cassandra-ds"
-          },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-18' LIMIT 50"
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 50"
         }
       ],
       "transformations": [
