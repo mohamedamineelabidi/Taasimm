@@ -66,6 +66,9 @@ ZONE_INFO = {
 # or directly from S3 if running in container
 model_pipeline = None
 
+# ── Cassandra session ────────────────────────────────────────────────
+cassandra_session = None
+
 
 # ── Pydantic Models ─────────────────────────────────────────────────
 class ForecastRequest(BaseModel):
@@ -208,6 +211,37 @@ def predict_demand(zone_id: int, dt: datetime) -> float:
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
+@app.get("/api/vehicles/{zone_id}")
+async def get_vehicles(zone_id: int, token: dict = Depends(verify_token)):
+    """Get active vehicles in a zone (last 24h from Cassandra)."""
+    if zone_id not in ZONE_INFO:
+        raise HTTPException(status_code=404, detail=f"Zone {zone_id} not found")
+
+    vehicles = []
+    if cassandra_session is not None:
+        try:
+            rows = cassandra_session.execute(
+                "SELECT taxi_id, zone_id, lat, lon, speed, event_time FROM taasim.vehicle_positions "
+                "WHERE city=%s AND zone_id=%s LIMIT 50",
+                ("casablanca", zone_id),
+            )
+            vehicles = [
+                {
+                    "taxi_id": r.taxi_id,
+                    "zone_id": r.zone_id,
+                    "lat": r.lat,
+                    "lon": r.lon,
+                    "speed": r.speed,
+                    "event_time": str(r.event_time),
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            log.warning("Cassandra query failed for vehicles: %s", e)
+
+    return {"zone_id": zone_id, "zone_name": ZONE_INFO[zone_id]["name"], "count": len(vehicles), "vehicles": vehicles}
+
+
 @app.get("/api/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(
@@ -288,11 +322,24 @@ async def get_zone(zone_id: int, token: dict = Depends(verify_token)):
     return {"zone_id": zone_id, **ZONE_INFO[zone_id]}
 
 
-# ── Startup: load model ─────────────────────────────────────────────
+# ── Startup: connect Cassandra + load model ─────────────────────────
 @app.on_event("startup")
 async def load_model():
-    """Try to load GBT model at startup."""
-    global model_pipeline
+    """Connect to Cassandra and try to load GBT model at startup."""
+    global model_pipeline, cassandra_session
+
+    # Cassandra
+    try:
+        from cassandra.cluster import Cluster
+        cassandra_host = os.getenv("CASSANDRA_HOST", "cassandra")
+        cluster = Cluster([cassandra_host])
+        cassandra_session = cluster.connect("taasim")
+        log.info("Cassandra connected: %s", cassandra_host)
+    except Exception as e:
+        log.warning("Cassandra not available (vehicles endpoint will return empty): %s", e)
+        cassandra_session = None
+
+    # ML model
     try:
         from pyspark.sql import SparkSession
         from pyspark.ml import PipelineModel
