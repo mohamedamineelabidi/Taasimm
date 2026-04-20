@@ -473,8 +473,9 @@
     },
     {
       "id": 8,
-      "title": "Trip Requests \u2014 Origins (red) & Destinations (blue)",
+      "title": "Trip Requests \u2014 Pickups & Dropoffs",
       "type": "geomap",
+      "interval": "10s",
       "gridPos": {
         "h": 16,
         "w": 24,
@@ -487,14 +488,24 @@
       },
       "targets": [
         {
-          "refId": "A",
+          "refId": "origins",
           "datasource": {
             "type": "hadesarchitect-cassandra-datasource",
             "uid": "cassandra-ds"
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-19' LIMIT 100"
+          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 100"
+        },
+        {
+          "refId": "destinations",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT trip_id, dest_lat, dest_lon, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 100"
         }
       ],
       "options": {
@@ -516,7 +527,7 @@
         "layers": [
           {
             "type": "markers",
-            "name": "Pickup (origin)",
+            "name": "Pickups",
             "config": {
               "showLegend": true,
               "style": {
@@ -524,12 +535,12 @@
                   "fixed": 8
                 },
                 "color": {
-                  "fixed": "red"
+                  "fixed": "#FF4D4F"
                 },
                 "symbol": {
                   "fixed": "circle"
                 },
-                "opacity": 0.8,
+                "opacity": 0.85,
                 "text": {
                   "field": "origin_zone",
                   "fixed": ""
@@ -537,7 +548,7 @@
                 "textConfig": {
                   "fontSize": 9,
                   "offsetX": 0,
-                  "offsetY": -10
+                  "offsetY": -12
                 }
               }
             },
@@ -549,7 +560,7 @@
           },
           {
             "type": "markers",
-            "name": "Dropoff (destination)",
+            "name": "Dropoffs",
             "config": {
               "showLegend": true,
               "style": {
@@ -557,12 +568,12 @@
                   "fixed": 7
                 },
                 "color": {
-                  "fixed": "blue"
+                  "fixed": "#1890FF"
                 },
                 "symbol": {
                   "fixed": "triangle"
                 },
-                "opacity": 0.7
+                "opacity": 0.75
               }
             },
             "location": {
@@ -571,11 +582,27 @@
               "longitude": "dest_lon"
             }
           }
-        ]
+        ],
+        "tooltip": {
+          "mode": "details"
+        }
       },
       "fieldConfig": {
         "defaults": {},
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "matched": { "text": "Matched", "color": "green" } } },
+                  { "type": "value", "options": { "no_vehicle": { "text": "No Vehicle", "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
       }
     },
     {
