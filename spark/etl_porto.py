@@ -50,6 +50,12 @@ def build_spark():
         .appName("TaaSim-ETL-Porto")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.shuffle.partitions", "8")
+        # S3A committer: algorithm v2 writes tasks directly to final path,
+        # avoiding the copy+delete "rename" that silently fails on MinIO
+        # with partitionBy() writes (FileOutputCommitter v1 default).
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
+        .config("spark.hadoop.fs.s3a.fast.upload", "true")
+        .config("spark.hadoop.fs.s3a.fast.upload.buffer", "bytebuffer")
         .getOrCreate()
     )
 
@@ -263,6 +269,12 @@ def main():
         .partitionBy("year_month")
         .parquet(OUTPUT_PATH)
     )
+
+    # Verify the write actually landed in S3
+    written_count = spark.read.parquet(OUTPUT_PATH).count()
+    log.info("Write verified: %d rows confirmed at %s", written_count, OUTPUT_PATH)
+    if written_count == 0:
+        raise RuntimeError("S3A write produced 0 rows — data was not persisted to MinIO")
 
     # ── 7. Summary stats ────────────────────────────────────────────
     log.info("=== ETL Summary ===")

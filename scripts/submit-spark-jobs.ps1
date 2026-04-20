@@ -18,6 +18,7 @@
 #>
 param(
     [string]$Jobs = "all"
+    # Valid values: "all", "porto", "nyc", "kpis", "features", "train", "verify", "ml"
 )
 
 $ErrorActionPreference = "Stop"
@@ -78,6 +79,53 @@ if ($Jobs -in @("all", "kpis")) {
         Write-Host "  KPI Analytics completed in $([math]::Round($elapsed.TotalSeconds))s" -ForegroundColor Green
     } else {
         Write-Host "  KPI Analytics FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
+    }
+    Write-Host ""
+}
+
+Write-Host "=== Submission Complete ===" -ForegroundColor Cyan
+Write-Host "  Spark Web UI: http://localhost:8080" -ForegroundColor DarkGray
+# ── Feature Engineering ──────────────────────────────────────────────
+if ($Jobs -in @("all", "ml", "features")) {
+    Write-Host "[4] Submitting Feature Engineering job..." -ForegroundColor Yellow
+    Write-Host "    (requires Porto ETL output in s3a://curated/trips/)" -ForegroundColor DarkGray
+    $start = Get-Date
+    docker exec $MASTER bash -c "$SUBMIT /opt/spark-jobs/feature_engineering.py 2>&1"
+    $elapsed = (Get-Date) - $start
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Feature Engineering completed in $([math]::Round($elapsed.TotalSeconds))s" -ForegroundColor Green
+    } else {
+        Write-Host "  Feature Engineering FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
+    }
+    Write-Host ""
+}
+
+# ── Train Demand Model ───────────────────────────────────────────────
+if ($Jobs -in @("all", "ml", "train")) {
+    Write-Host "[5] Submitting Train Demand Model job..." -ForegroundColor Yellow
+    Write-Host "    (requires feature matrix in s3a://mldata/features/)" -ForegroundColor DarkGray
+    $start = Get-Date
+    docker exec $MASTER bash -c "$SUBMIT /opt/spark-jobs/train_demand_model.py 2>&1"
+    $elapsed = (Get-Date) - $start
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Train Demand Model completed in $([math]::Round($elapsed.TotalSeconds))s" -ForegroundColor Green
+    } else {
+        Write-Host "  Train Demand Model FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
+    }
+    Write-Host ""
+}
+
+# ── Verify Model ─────────────────────────────────────────────────────
+if ($Jobs -in @("ml", "verify")) {
+    Write-Host "[6] Running Model Verification..." -ForegroundColor Yellow
+    Write-Host "    (requires trained model in s3a://mldata/models/demand_v1/)" -ForegroundColor DarkGray
+    $start = Get-Date
+    docker exec $MASTER bash -c "$SUBMIT /opt/spark-jobs/verify_model.py 2>&1"
+    $elapsed = (Get-Date) - $start
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Model Verification completed in $([math]::Round($elapsed.TotalSeconds))s" -ForegroundColor Green
+    } else {
+        Write-Host "  Model Verification FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
     }
     Write-Host ""
 }
