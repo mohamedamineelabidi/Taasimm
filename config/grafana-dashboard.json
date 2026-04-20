@@ -1,15 +1,46 @@
 {
-  "title": "TaaSim - Vehicle Tracking",
+  "title": "TaaSim — Live Operations",
   "uid": "taasim-vehicles",
+  "description": "Real-time monitoring of the TaaSim taxi platform: vehicle tracking, demand zones, and trip matching across 16 Casablanca zones",
   "timezone": "utc",
   "refresh": "10s",
   "time": { "from": "now-1h", "to": "now" },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": ["taasim", "streaming"],
+  "templating": {
+    "list": [
+      {
+        "name": "date_bucket",
+        "type": "textbox",
+        "label": "Trip Date",
+        "description": "Date partition for trip queries (YYYY-MM-DD)",
+        "current": { "value": "2026-04-18", "text": "2026-04-18", "selected": false },
+        "query": "2026-04-18",
+        "hide": 0
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "links": [],
   "panels": [
+
     {
-      "id": 1,
-      "title": "Vehicle Positions (Live)",
+      "id": 101,
+      "type": "row",
+      "title": "Live Operations",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 5,
+      "title": "Vehicle Positions — Live",
+      "description": "Real-time fleet map: one marker per taxi (latest GPS ping). Red = stopped (<10 km/h), yellow = slow (10–30), green = moving (≥30). Marker size scales with speed.",
       "type": "geomap",
-      "gridPos": { "h": 16, "w": 16, "x": 0, "y": 0 },
+      "gridPos": { "h": 16, "w": 15, "x": 0, "y": 1 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
       "targets": [
         {
@@ -17,9 +48,69 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 200 ALLOW FILTERING"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) PER PARTITION LIMIT 30"
         }
       ],
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              { "field": "event_time", "desc": true }
+            ]
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "taxi_id":    { "operation": "groupby",   "aggregations": [] },
+              "lat":        { "operation": "aggregate",  "aggregations": ["first"] },
+              "lon":        { "operation": "aggregate",  "aggregations": ["first"] },
+              "speed":      { "operation": "aggregate",  "aggregations": ["first"] },
+              "zone_id":    { "operation": "aggregate",  "aggregations": ["first"] },
+              "status":     { "operation": "aggregate",  "aggregations": ["first"] },
+              "event_time": { "operation": "aggregate",  "aggregations": ["first"] }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "lat (first)": "lat",
+              "lon (first)": "lon",
+              "speed (first)": "speed",
+              "zone_id (first)": "zone_id",
+              "status (first)": "status",
+              "event_time (first)": "event_time"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "speed" },
+            "properties": [
+              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "#EAB839", "value": 10 },
+                    { "color": "green", "value": 30 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
       "options": {
         "view": {
           "id": "coords",
@@ -43,30 +134,34 @@
             "config": {
               "showLegend": true,
               "style": {
-                "size": { "fixed": 8 },
-                "color": { "field": "zone_id", "fixed": "green" },
-                "symbol": { "fixed": "circle" },
-                "opacity": 0.8
+                "size": {
+                  "field": "speed",
+                  "min": 4,
+                  "max": 14
+                },
+                "color": { "field": "speed" },
+                "symbol": { "fixed": "img/icons/marker/circle.svg" },
+                "opacity": 0.85
               }
             },
             "location": {
               "mode": "coords",
               "latitude": "lat",
               "longitude": "lon"
-            }
+            },
+            "tooltip": true
           }
-        ]
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        ],
+        "tooltip": { "mode": "details" }
       }
     },
+
     {
-      "id": 2,
-      "title": "Vehicles per Zone",
+      "id": 6,
+      "title": "Demand vs Supply by Zone",
+      "description": "Side-by-side comparison per zone: green = vehicles (supply), red = requests (demand). Latest 30s window.",
       "type": "barchart",
-      "gridPos": { "h": 16, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 16, "w": 9, "x": 15, "y": 1 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
       "targets": [
         {
@@ -74,39 +169,10 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, speed, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 100 ALLOW FILTERING"
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) PER PARTITION LIMIT 1"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" }
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "xField": "zone_id"
-      },
       "transformations": [
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "zone_id": {
-                "operation": "groupby",
-                "aggregations": []
-              },
-              "taxi_id": {
-                "operation": "aggregate",
-                "aggregations": ["count"]
-              }
-            }
-          }
-        },
         {
           "id": "convertFieldType",
           "options": {
@@ -115,46 +181,6 @@
             ]
           }
         }
-      ]
-    },
-    {
-      "id": 3,
-      "title": "Recent GPS Events",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 50 ALLOW FILTERING"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [{ "displayName": "event_time", "desc": true }]
-      }
-    },
-    {
-      "id": 4,
-      "title": "Demand vs Supply by Zone",
-      "type": "barchart",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 26 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 100 ALLOW FILTERING"
-        }
       ],
       "fieldConfig": {
         "defaults": {
@@ -162,12 +188,18 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "active_vehicles (lastNotNull)" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": { "id": "byName", "options": "active_vehicles" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
+              { "id": "displayName", "value": "Vehicles (Supply)" }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "pending_requests (lastNotNull)" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": { "id": "byName", "options": "pending_requests" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "displayName", "value": "Requests (Demand)" }
+            ]
           }
         ]
       },
@@ -177,19 +209,37 @@
         "barWidth": 0.8,
         "showValue": "auto",
         "stacking": "none",
-        "xField": "zone_id"
-      },
-      "transformations": [
+        "xField": "zone_id",
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Analytics & Trends",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 7,
+      "title": "Zone Demand Pressure",
+      "description": "Demand/supply ratio per zone — green = balanced (<2), yellow = moderate (2–4), orange = high (4–6), red = critical (>6)",
+      "type": "bargauge",
+      "gridPos": { "h": 10, "w": 8, "x": 0, "y": 18 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
         {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "zone_id": { "operation": "groupby", "aggregations": [] },
-              "active_vehicles": { "operation": "aggregate", "aggregations": ["lastNotNull"] },
-              "pending_requests": { "operation": "aggregate", "aggregations": ["lastNotNull"] }
-            }
-          }
-        },
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, ratio FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) PER PARTITION LIMIT 1"
+        }
+      ],
+      "transformations": [
         {
           "id": "convertFieldType",
           "options": {
@@ -197,35 +247,50 @@
               { "targetField": "zone_id", "destinationType": "string" }
             ]
           }
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "title": "Demand Zone Details",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 26 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-      "targets": [
+        },
         {
-          "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 50 ALLOW FILTERING"
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              { "fieldName": "zone_id", "handlerKey": "field.name" },
+              { "fieldName": "ratio", "handlerKey": "field.value" }
+            ]
+          }
         }
       ],
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#EAB839", "value": 2 },
+              { "color": "orange", "value": 4 },
+              { "color": "red", "value": 6 }
+            ]
+          },
+          "min": 0,
+          "max": 10
+        },
+        "overrides": []
+      },
       "options": {
-        "showHeader": true,
-        "sortBy": [{ "displayName": "window_start", "desc": true }]
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "minVizWidth": 8,
+        "minVizHeight": 10
       }
     },
+
     {
-      "id": 6,
-      "title": "Trip Matching Results",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 36 },
+      "id": 8,
+      "title": "Trip Matching Status",
+      "description": "Distribution of trip outcomes: matched (driver assigned) vs no_vehicle (no driver available)",
+      "type": "piechart",
+      "gridPos": { "h": 10, "w": 8, "x": 8, "y": 18 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
       "targets": [
         {
@@ -233,14 +298,310 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-18' LIMIT 50 ALLOW FILTERING"
+          "target": "SELECT status, trip_id FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 1000"
         }
       ],
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "status": { "operation": "groupby", "aggregations": [] },
+              "trip_id": { "operation": "aggregate", "aggregations": ["count"] }
+            }
+          }
+        },
+        {
+          "id": "rowsToFields",
+          "options": {
+            "mappings": [
+              { "fieldName": "status", "handlerKey": "field.name" },
+              { "fieldName": "trip_id (count)", "handlerKey": "field.value" }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "matched" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "no_vehicle" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "pieType": "pie",
+        "displayLabels": ["name", "percent", "value"],
+        "legend": { "displayMode": "list", "placement": "right", "values": ["percent"] },
+        "tooltip": { "mode": "single" }
+      }
+    },
+
+    {
+      "id": 9,
+      "title": "Demand vs Supply — Trend",
+      "description": "Aggregated supply (vehicles) and demand (requests) across all zones over time. Each point is a 30-second tumbling window.",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 18 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) PER PARTITION LIMIT 20"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "window_start": { "operation": "groupby", "aggregations": [] },
+              "active_vehicles": { "operation": "aggregate", "aggregations": ["sum"] },
+              "pending_requests": { "operation": "aggregate", "aggregations": ["sum"] }
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [{ "field": "window_start" }]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "spanNulls": false,
+            "showPoints": "auto",
+            "pointSize": 5
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "active_vehicles (sum)" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } },
+              { "id": "displayName", "value": "Supply (Vehicles)" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "pending_requests (sum)" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "displayName", "value": "Demand (Requests)" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Detailed Data",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+      "collapsed": false,
+      "panels": []
+    },
+
+    {
+      "id": 10,
+      "title": "Zone Drilldown",
+      "description": "Latest metrics per zone: vehicles, requests, demand ratio, and last update timestamp",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 29 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) PER PARTITION LIMIT 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": { "type": "auto" },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "zone_id" },
+            "properties": [
+              { "id": "displayName", "value": "Zone" },
+              { "id": "custom.width", "value": 60 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "active_vehicles" },
+            "properties": [
+              { "id": "displayName", "value": "Vehicles" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "pending_requests" },
+            "properties": [
+              { "id": "displayName", "value": "Requests" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "ratio" },
+            "properties": [
+              { "id": "displayName", "value": "D/S Ratio" },
+              { "id": "decimals", "value": 1 },
+              { "id": "color", "value": { "mode": "thresholds" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "#EAB839", "value": 2 },
+                    { "color": "orange", "value": 4 },
+                    { "color": "red", "value": 6 }
+                  ]
+                }
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "window_start" },
+            "properties": [
+              { "id": "displayName", "value": "Last Update" }
+            ]
+          }
+        ]
+      },
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "created_at", "desc": true }]
+        "sortBy": [{ "displayName": "Zone", "desc": false }],
+        "footer": { "show": false }
+      }
+    },
+
+    {
+      "id": 11,
+      "title": "Recent Trips",
+      "description": "Latest trip matching results: driver assignment, zones, ETA, and fare",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 29 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT trip_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": { "type": "auto" },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "trip_id" },
+            "properties": [
+              { "id": "displayName", "value": "Trip ID" },
+              { "id": "custom.width", "value": 100 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "taxi_id" },
+            "properties": [
+              { "id": "displayName", "value": "Taxi" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              { "id": "displayName", "value": "Status" },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "matched": { "text": "Matched", "color": "green", "index": 0 },
+                      "no_vehicle": { "text": "No Vehicle", "color": "red", "index": 1 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "origin_zone" },
+            "properties": [{ "id": "displayName", "value": "From Zone" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "dest_zone" },
+            "properties": [{ "id": "displayName", "value": "To Zone" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "eta_seconds" },
+            "properties": [
+              { "id": "displayName", "value": "ETA (s)" },
+              { "id": "unit", "value": "s" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "fare" },
+            "properties": [
+              { "id": "displayName", "value": "Fare (MAD)" },
+              { "id": "decimals", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "created_at" },
+            "properties": [
+              { "id": "displayName", "value": "Time" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Time", "desc": true }],
+        "footer": { "show": false }
       }
     }
+
   ]
 }

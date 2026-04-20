@@ -1,7 +1,7 @@
 """
 Flink Job 1 — GPS Normalizer
 Reads raw.gps from Kafka, validates coordinates, assigns zones,
-anonymizes lat/lon to centroid, writes to Cassandra + processed.gps Kafka topic.
+anonymizes lat/lon to H3 cell center
 """
 
 import json
@@ -61,7 +61,7 @@ class GpsDeduplicator(KeyedProcessFunction):
     validates, assigns zone, anonymizes to centroid, writes Cassandra + Kafka."""
 
     def open(self, runtime_context: RuntimeContext):
-        import csv
+        
 
         # ValueState for per-taxi deduplication (last seen event_time in ms)
         ttl_config = (
@@ -86,21 +86,8 @@ class GpsDeduplicator(KeyedProcessFunction):
                 self.h3_lookup = json.load(f)
         except Exception as e:
             logger.error(f"H3 lookup load failed: {e}")
-
-        # Load zone centroids for anonymization
-        self.zone_centroids = {}
-        try:
-            with open("/opt/flink/data/zone_mapping.csv", "r") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    zid = int(row["zone_id"])
-                    self.zone_centroids[zid] = (
-                        float(row["casa_centroid_lat"]),
-                        float(row["casa_centroid_lon"]),
-                    )
-        except Exception as e:
-            logger.error(f"Zone centroid load failed: {e}")
-        logger.info(f"Loaded {len(self.h3_lookup)} H3 cells, {len(self.zone_centroids)} zone centroids")
+        logger.info(f"Loaded {len(self.h3_lookup)} H3 cells")
+        
 
         # Initialize Cassandra connection
         from cassandra.cluster import Cluster
@@ -171,11 +158,9 @@ class GpsDeduplicator(KeyedProcessFunction):
         if zone_id is None:
             return
 
-        # Anonymize: snap to zone centroid
-        centroid = self.zone_centroids.get(zone_id)
-        if centroid is None:
-            return
-        centroid_lat, centroid_lon = centroid
+        # Anonymize: snap to H3 cell center (~87m precision, res 9)
+        import h3
+        h3_lat, h3_lon = h3.cell_to_latlng(cell)
 
         # Parse canonical event_time
         try:
@@ -188,7 +173,7 @@ class GpsDeduplicator(KeyedProcessFunction):
             self.session.execute_async(
                 self.insert_stmt,
                 ("casablanca", zone_id, event_time, taxi_id,
-                 centroid_lat, centroid_lon, speed, status, cell)
+                 h3_lat, h3_lon, speed, status, cell)
             )
         except Exception as e:
             logger.error(f"Cassandra write error: {e}")
@@ -199,8 +184,8 @@ class GpsDeduplicator(KeyedProcessFunction):
             "zone_id": zone_id,
             "h3_index": cell,
             "event_time": event_time_str,
-            "centroid_lat": centroid_lat,
-            "centroid_lon": centroid_lon,
+            "lat": h3_lat,
+            "lon": h3_lon,
             "speed_kmh": speed,
             "status": status,
         }
