@@ -38,7 +38,8 @@ REPLAY_SPEED = 10            # 10x real-time
 # ── Zone mapping CSV path ────────────────────────────────────────────
 # /data is the container mount; fall back to ../data for local dev
 _local_data = os.path.join(os.path.dirname(__file__), "..", "data")
-DATA_DIR = "/data" if os.path.isdir("/data") else _local_data
+_container_data = "/data"
+DATA_DIR = _container_data if os.path.isfile(os.path.join(_container_data, "zone_mapping.csv")) else _local_data
 ZONE_MAPPING_PATH = os.path.join(DATA_DIR, "zone_mapping.csv")
 PORTO_CSV_PATH = os.path.join(DATA_DIR, "train.csv")
 H3_LOOKUP_PATH = os.path.join(DATA_DIR, "h3_zone_lookup.json")
