@@ -19,6 +19,8 @@ Last updated: 2026-04-19
 
 ## Update Log
 
+- 2026-04-20: Fixed S3A partitioned write silently failing on MinIO — root cause: FileOutputCommitter v1 uses server-side copy+delete rename which fails on MinIO with partitionBy(). Fix: algorithm.version=2 + fast.upload=true in spark-defaults.conf and SparkSession. Porto ETL re-verified: 1,481,827 rows in curated/trips/. KPI Analytics: 1.48M trips, busiest zone=5 (Sidi Bernoussi), peak hour=8:00. Feature engineering: 236,444 zone-window rows in mldata/features/. GBT model: RMSE=2.4491, R²=0.7943, 26% improvement over 7-day-lag baseline. Model saved to mldata/models/demand_v1/. Commit: 739aa42. API /api/vehicles/{zone_id} endpoint added + cassandra-driver==3.29.1 fix. Commit: 4a6bea9.
+
 - 2026-04-19: Week 6 ML Pipeline complete — Feature engineering (183,981 rows), GBT model (RMSE 3.71, R² 0.75, 45.8% improvement), FastAPI API with JWT auth. Model saved to s3a://mldata/models/demand_v1/. Docker: added taasim-api service + numpy persistence. Evidence: 10_week6_ml_pipeline.md.
 - 2026-04-19: Week 5 Spark ETL complete — Porto ETL (43 MiB, 12 partitions), NYC ETL (4.3 MiB, 192K demand rows), KPI Analytics (6 datasets). All outputs verified in MinIO curated/. Docker RAM upgraded (worker 4g, master 3g limit). Evidence doc: 09_week5_spark_etl.md.
 - 2026-04-17: Week 3 complete — All 3 Flink jobs deployed and running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand Aggregator + Trip Matcher operational. Kafka UI added. Data flow verified end-to-end. Created verification evidence doc (08_week3_completion.md).
