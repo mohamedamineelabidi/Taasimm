@@ -47,6 +47,8 @@ FEATURE_COLS = [
     "demand_lag_1d",
     "demand_lag_7d",
     "rolling_7d_mean",
+    "population_density",
+    "zone_type_idx",     # StringIndexer output
 ]
 
 TARGET_COL = "demand"
@@ -95,6 +97,13 @@ def main():
         handleInvalid="keep",
     )
 
+    # Index zone_type as categorical
+    zone_type_indexer = StringIndexer(
+        inputCol="zone_type",
+        outputCol="zone_type_idx",
+        handleInvalid="keep",
+    )
+
     # Assemble feature vector
     assembler = VectorAssembler(
         inputCols=FEATURE_COLS,
@@ -113,7 +122,7 @@ def main():
         seed=42,
     )
 
-    pipeline = Pipeline(stages=[zone_indexer, assembler, gbt])
+    pipeline = Pipeline(stages=[zone_indexer, zone_type_indexer, assembler, gbt])
 
     # ── 4. Train ─────────────────────────────────────────────────────
     log.info("Training GBT model (maxDepth=5, maxIter=50)...")
@@ -177,7 +186,15 @@ def main():
     log.info("=== Feature Importance ===")
     for i, col in enumerate(FEATURE_COLS):
         log.info("  %-22s %.4f", col, importances[i])
-
+    # ── 8b. Save feature importances as JSON ───────────────────────
+    importances_data = [
+        {"feature": col, "importance": float(importances[i])}
+        for i, col in enumerate(FEATURE_COLS)
+    ]
+    spark.createDataFrame(importances_data).coalesce(1).write.mode("overwrite").json(
+        "s3a://mldata/metrics/feature_importance.json"
+    )
+    log.info("Feature importances saved to s3a://mldata/metrics/feature_importance.json")
     # ── 9. Save model ────────────────────────────────────────────────
     log.info("Saving model to %s", MODEL_PATH)
     model.write().overwrite().save(MODEL_PATH)

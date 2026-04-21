@@ -43,22 +43,22 @@ security = HTTPBearer()
 
 # ── Zone centroids (from zone_mapping.csv) ───────────────────────────
 ZONE_INFO = {
-    1:  {"name": "Ain Chock",      "lat": 33.5266, "lon": -7.6216},
-    2:  {"name": "Sidi Othmane",   "lat": 33.5550, "lon": -7.5625},
-    3:  {"name": "Sidi Moumen",    "lat": 33.5850, "lon": -7.5075},
-    4:  {"name": "Hay Hassani",    "lat": 33.5465, "lon": -7.6803},
-    5:  {"name": "Sbata",          "lat": 33.5358, "lon": -7.5580},
-    6:  {"name": "Ben Msik",       "lat": 33.5414, "lon": -7.5650},
-    7:  {"name": "Moulay Rachid",  "lat": 33.5685, "lon": -7.5400},
-    8:  {"name": "Maarif",         "lat": 33.5704, "lon": -7.6325},
-    9:  {"name": "Al Fida",        "lat": 33.5652, "lon": -7.5949},
-    10: {"name": "Mers Sultan",    "lat": 33.5775, "lon": -7.6015},
-    11: {"name": "Roches Noires",  "lat": 33.5925, "lon": -7.5940},
-    12: {"name": "Hay Mohammadi",  "lat": 33.5820, "lon": -7.5575},
-    13: {"name": "Anfa",           "lat": 33.5950, "lon": -7.6525},
-    14: {"name": "Sidi Belyout",   "lat": 33.5985, "lon": -7.6149},
-    15: {"name": "Casa-Anfa",      "lat": 33.6050, "lon": -7.5850},
-    16: {"name": "Sidi Bernoussi", "lat": 33.6150, "lon": -7.5150},
+    1:  {"name": "Ain Chock",      "lat": 33.5266, "lon": -7.6216, "pop_density": 12000.0, "zone_type": "residential"},
+    2:  {"name": "Sidi Othmane",   "lat": 33.5550, "lon": -7.5625, "pop_density": 25000.0, "zone_type": "residential"},
+    3:  {"name": "Sidi Moumen",    "lat": 33.5850, "lon": -7.5075, "pop_density":  8000.0, "zone_type": "residential"},
+    4:  {"name": "Hay Hassani",    "lat": 33.5465, "lon": -7.6803, "pop_density": 15000.0, "zone_type": "residential"},
+    5:  {"name": "Sbata",          "lat": 33.5358, "lon": -7.5580, "pop_density": 18000.0, "zone_type": "residential"},
+    6:  {"name": "Ben Msik",       "lat": 33.5414, "lon": -7.5650, "pop_density": 22000.0, "zone_type": "residential"},
+    7:  {"name": "Moulay Rachid",  "lat": 33.5685, "lon": -7.5400, "pop_density": 20000.0, "zone_type": "residential"},
+    8:  {"name": "Maarif",         "lat": 33.5704, "lon": -7.6325, "pop_density":  5000.0, "zone_type": "commercial"},
+    9:  {"name": "Al Fida",        "lat": 33.5652, "lon": -7.5949, "pop_density": 30000.0, "zone_type": "residential"},
+    10: {"name": "Mers Sultan",    "lat": 33.5775, "lon": -7.6015, "pop_density":  8000.0, "zone_type": "commercial"},
+    11: {"name": "Roches Noires",  "lat": 33.5925, "lon": -7.5940, "pop_density": 12000.0, "zone_type": "mixed"},
+    12: {"name": "Hay Mohammadi",  "lat": 33.5820, "lon": -7.5575, "pop_density": 20000.0, "zone_type": "mixed"},
+    13: {"name": "Anfa",           "lat": 33.5950, "lon": -7.6525, "pop_density":  3000.0, "zone_type": "commercial"},
+    14: {"name": "Sidi Belyout",   "lat": 33.5985, "lon": -7.6149, "pop_density": 25000.0, "zone_type": "transit_hub"},
+    15: {"name": "Casa-Anfa",      "lat": 33.6050, "lon": -7.5850, "pop_density":  6000.0, "zone_type": "mixed"},
+    16: {"name": "Sidi Bernoussi", "lat": 33.6150, "lon": -7.5150, "pop_density": 15000.0, "zone_type": "mixed"},
 }
 
 # ── ML Model (loaded at startup) ────────────────────────────────────
@@ -158,15 +158,32 @@ def require_admin(token: dict = Depends(verify_token)):
 # ── Forecast logic (uses lag-based prediction when model unavailable)
 def predict_demand(zone_id: int, dt: datetime) -> float:
     """Predict demand for a zone at a given datetime.
-    Uses ML model if loaded, otherwise falls back to historical average."""
+    Priority: 1) Cassandra pre-computed forecast  2) ML model  3) heuristic."""
     hour = dt.hour
     day_of_week = dt.weekday()
     slot_of_day = hour * 2 + (1 if dt.minute >= 30 else 0)
     is_weekend = 1 if day_of_week >= 5 else 0
     is_peak = 1 if hour in [8, 9, 13, 14, 17, 18] else 0
 
+    # ── Fast path: Cassandra pre-computed forecast ───────────────────
+    if cassandra_session is not None:
+        try:
+            rows = cassandra_session.execute(
+                "SELECT forecast_demand FROM taasim.demand_zones "
+                "WHERE city='casablanca' AND zone_id=%s "
+                "ORDER BY window_start DESC LIMIT 1",
+                (zone_id,),
+            )
+            row = rows.one()
+            if row and row.forecast_demand is not None:
+                log.debug("Cassandra forecast hit for zone %d: %.1f", zone_id, row.forecast_demand)
+                return float(row.forecast_demand)
+        except Exception as e:
+            log.warning("Cassandra forecast lookup failed: %s", e)
+
+    # ── ML model path ────────────────────────────────────────────────
     if model_pipeline is not None:
-        # Use PySpark model for prediction
+        zone_meta = ZONE_INFO.get(zone_id, {})
         try:
             from pyspark.sql import SparkSession, Row
             spark = SparkSession.builder.getOrCreate()
@@ -177,10 +194,12 @@ def predict_demand(zone_id: int, dt: datetime) -> float:
                 day_of_week=day_of_week,
                 is_weekend=is_weekend,
                 is_peak=is_peak,
-                supply_demand_ratio=0.5,  # default estimate
-                demand_lag_1d=50.0,       # historical average fallback
+                supply_demand_ratio=0.5,
+                demand_lag_1d=50.0,
                 demand_lag_7d=50.0,
                 rolling_7d_mean=50.0,
+                population_density=float(zone_meta.get("pop_density", 10000.0)),
+                zone_type=zone_meta.get("zone_type", "mixed"),
             )
             df = spark.createDataFrame([row])
             pred = model_pipeline.transform(df)

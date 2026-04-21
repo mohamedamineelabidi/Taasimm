@@ -130,6 +130,23 @@ if ($Jobs -in @("ml", "verify")) {
     Write-Host ""
 }
 
+# ── Batch Forecast ───────────────────────────────────────────────────
+if ($Jobs -in @("all", "ml", "forecast")) {
+    Write-Host "[7] Submitting Batch Forecast job..." -ForegroundColor Yellow
+    Write-Host "    (requires trained model in s3a://mldata/models/demand_v1/)" -ForegroundColor DarkGray
+    # Ensure cassandra-driver is installed in Spark container
+    docker exec $MASTER bash -c "pip install cassandra-driver==3.29.1 --quiet" | Out-Null
+    $start = Get-Date
+    docker exec $MASTER bash -c "$SUBMIT /opt/spark-jobs/batch_forecast.py 2>&1"
+    $elapsed = (Get-Date) - $start
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Batch Forecast completed in $([math]::Round($elapsed.TotalSeconds))s" -ForegroundColor Green
+    } else {
+        Write-Host "  Batch Forecast FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
+    }
+    Write-Host ""
+}
+
 Write-Host "=== Submission Complete ===" -ForegroundColor Cyan
 Write-Host "  Spark Web UI: http://localhost:8080" -ForegroundColor DarkGray
 Write-Host "  Check MinIO:  docker exec taasim-minio mc ls local/curated/ --recursive" -ForegroundColor DarkGray

@@ -1371,6 +1371,176 @@
           ]
         }
       }
+    },
+    {
+      "id": 7,
+      "title": "Demand Forecast per Zone (ML — GBT)",
+      "type": "barchart",
+      "description": "Pre-computed GBT demand forecast per zone for the next 30-min slot, written by batch_forecast.py",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=1 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=2 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=3 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=4 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "E",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=5 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "F",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=6 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "G",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=7 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "H",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=8 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "I",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=9 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "J",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=10 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "K",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=11 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "L",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=12 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "M",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=13 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "N",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=14 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "O",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=15 ORDER BY window_start DESC LIMIT 1"
+        },
+        {
+          "refId": "P",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, forecast_demand FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=16 ORDER BY window_start DESC LIMIT 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "zone_id": { "operation": "groupby", "aggregations": [] },
+              "forecast_demand": { "operation": "aggregate", "aggregations": ["mean"] }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "forecast_demand (mean)": "Forecast Demand (trips/30min)"
+            }
+          }
+        }
+      ]
     }
   ]
 }
