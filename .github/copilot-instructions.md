@@ -89,13 +89,32 @@ TaaSim follows a **Kappa Architecture**: Kafka is the system of record, Flink ha
 | Kafka Connect REST | `localhost:8083` | — |
 | Grafana | `localhost:3000` | admin / admin |
 
+### Producers (Phase-4 Coupled Mode — Current Default)
+
+Both producers run inside Docker (`taasim-trip-producer`, `taasim-gps-producer`) and start automatically with the stack. They replay the Phase-4 NYC→Casa synthesis (500k trips, 90 days, wall-clock rebased) paired with Phase-3 OSRM trajectories (500 routed polylines).
+
+| Producer | Mode | Source | CLI flags |
+|----------|------|--------|-----------|
+| `trip_request_producer.py` | `casa_synth` (default) | `/data/casa_synthesis/casa_trip_requests.parquet` | `--source casa_synth \| random`, `--speed 50`, `--max-trips N` |
+| `vehicle_gps_producer.py` | `coupled` (default) | Phase-4 trips + `/data/casa_synthesis/gps_trajectory_index.json` (500 polylines, 160 zone-pairs, 25 tier-pairs) | `--mode coupled \| live`, `--speed 50`, `--fleet-size 2000`, `--ping-interval 4` |
+
+Docker-compose passes: `--mode coupled --speed 50 --fleet-size 2000` (GPS) and `--source casa_synth --speed 50` (Trip). Higher speed + fleet ensures >150 concurrent taxis so Job 3 match rate stays healthy (~21% at current settings; rest are `no_vehicle` due to simulation density — taxis only emit GPS during active trips).
+
+**After editing producer Python source, rebuild and recreate:**
+```powershell
+docker compose up -d --build --force-recreate gps-producer trip-producer
+```
+
+**Rebuild the trajectory index** (only after regenerating Phase-3 trajectories):
+```powershell
+.venv/Scripts/python.exe scripts/build_trajectory_index.py
+```
+
 ### Smoke Tests
 ```powershell
-# GPS producer (5 trips)
-.venv/Scripts/python.exe producers/vehicle_gps_producer.py --max-trips 5
-
-# Trip request producer (5 trips)
-.venv/Scripts/python.exe producers/trip_request_producer.py --max-trips 5
+# Local (no Docker) — small run against localhost:9092
+.venv/Scripts/python.exe producers/vehicle_gps_producer.py --mode coupled --max-trips 5
+.venv/Scripts/python.exe producers/trip_request_producer.py --source casa_synth --max-trips 5
 
 # Register Kafka Connect S3 Sink connectors
 .\scripts\register-connectors.ps1

@@ -1,11 +1,28 @@
 {
-  "title": "TaaSim - Vehicle Tracking",
+  "title": "TaaSim — Live Pipeline (Casablanca)",
   "uid": "taasim-vehicles",
   "timezone": "utc",
-  "refresh": "10s",
+  "refresh": "5s",
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "date_bucket",
+        "label": "Date Bucket",
+        "type": "custom",
+        "query": "2026-04-21,2026-04-20,2026-04-19,2026-04-18",
+        "current": { "text": "2026-04-21", "value": "2026-04-21" },
+        "options": [
+          { "text": "2026-04-21", "value": "2026-04-21", "selected": true },
+          { "text": "2026-04-20", "value": "2026-04-20", "selected": false },
+          { "text": "2026-04-19", "value": "2026-04-19", "selected": false },
+          { "text": "2026-04-18", "value": "2026-04-18", "selected": false }
+        ]
+      }
+    ]
   },
   "panels": [
     {
@@ -494,7 +511,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-19' LIMIT 100"
+          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 100"
         }
       ],
       "options": {
@@ -1292,7 +1309,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-19' LIMIT 50"
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 50"
         },
         {
           "refId": "B",
@@ -1302,7 +1319,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-18' LIMIT 50"
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 50"
         }
       ],
       "transformations": [

@@ -228,7 +228,7 @@ services:
     hostname: gps-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "vehicle_gps_producer.py", "--speed", "10"]
+    command: ["python", "vehicle_gps_producer.py", "--mode", "coupled", "--speed", "50", "--fleet-size", "2000"]
     volumes:
       - ./data:/data
     depends_on:
@@ -244,7 +244,7 @@ services:
     hostname: trip-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "trip_request_producer.py", "--base-rate", "2.0"]
+    command: ["python", "trip_request_producer.py", "--source", "casa_synth", "--speed", "50"]
     volumes:
       - ./data:/data
     depends_on:

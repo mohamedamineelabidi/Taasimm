@@ -44,6 +44,11 @@ PORTO_CSV_PATH = os.path.join(DATA_DIR, "train.csv")
 H3_LOOKUP_PATH = os.path.join(DATA_DIR, "h3_zone_lookup.json")
 H3_RESOLUTION = 9
 
+# ── Phase 4 (NYC→Casa synth) + Phase 3 (Casa OSRM trajectories) ─────
+PHASE4_TRIPS_PARQUET = os.path.join(DATA_DIR, "casa_synthesis", "casa_trip_requests.parquet")
+PHASE3_TRAJ_PARQUET  = os.path.join(DATA_DIR, "curated_trajectories_v4.parquet")
+GPS_TRAJ_INDEX_PATH  = os.path.join(DATA_DIR, "casa_synthesis", "gps_trajectory_index.json")
+
 
 def transform_coord(val, src_min, src_max, dst_min, dst_max):
     """Linear bounding-box transform with edge clamping."""

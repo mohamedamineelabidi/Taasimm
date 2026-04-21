@@ -17,7 +17,16 @@ data/train.csv
 data/nyc-tlc/
 data/remapped_trips_sample.csv
 data/curated_trajectories.parquet
+data/curated_trajectories_v4.parquet
 data/.projector_checkpoint.json
+data/.osrm_route_cache.json
+data/casa_synthesis/casa_trip_requests.parquet
+data/casa_synthesis/eda_figures.png
+data/hcp-data-casa/
+data/opportunity-find/
+
+# Script temp outputs
+scripts/_polyfetch.log
 
 # JARs (downloaded via scripts, not tracked)
 jars/
