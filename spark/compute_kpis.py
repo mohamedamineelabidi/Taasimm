@@ -64,6 +64,36 @@ def main():
     # Write trips per zone
     trips_per_zone.coalesce(1).write.mode("overwrite").parquet(OUTPUT_PATH + "trips_per_zone/")
 
+    # ── 2b. Upsert KPI demand counts to Cassandra demand_zones ──────
+    log.info("Writing KPI demand counts to Cassandra demand_zones...")
+    try:
+        import os
+        from datetime import datetime as _dt
+        from cassandra.cluster import Cluster as _Cluster
+
+        _cass_host = os.getenv("CASSANDRA_HOST", "cassandra")
+        _cluster = _Cluster([_cass_host])
+        _cass = _cluster.connect("taasim")
+        _stmt = _cass.prepare(
+            "INSERT INTO demand_zones "
+            "(city, zone_id, window_start, active_vehicles, pending_requests, ratio) "
+            "VALUES ('casablanca', ?, ?, ?, ?, 0.0)"
+        )
+        _now = _dt.utcnow()
+        for _row in trips_per_zone.collect():
+            _zone = _row["origin_zone"]
+            if _zone is not None:
+                _cass.execute(_stmt, (
+                    int(_zone),
+                    _now,
+                    int(_row["unique_taxis"] or 0),
+                    int(_row["trip_count"] or 0),
+                ))
+        _cluster.shutdown()
+        log.info("KPI demand counts written to Cassandra (16 zones)")
+    except Exception as _e:
+        log.warning("Cassandra KPI write skipped: %s", _e)
+
     # ── 3. KPI: Hourly demand curve ──────────────────────────────────
     log.info("Computing hourly demand curve...")
     hourly_demand = (

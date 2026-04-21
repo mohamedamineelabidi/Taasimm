@@ -20,9 +20,16 @@ from datetime import datetime
 from pyspark.sql import SparkSession, Row
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
+
     StructType, StructField, StringType, LongType, BooleanType,
     IntegerType, DoubleType, ArrayType, TimestampType
 )
+
+try:
+    import h3 as _h3_check  # noqa: F401
+    HAS_H3 = True
+except ImportError:
+    HAS_H3 = False
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [ETL-Porto] %(levelname)s %(message)s")
 log = logging.getLogger("ETL-Porto")
@@ -258,6 +265,26 @@ def main():
                     )
         )
     )
+
+    # ── 5b. H3 zone index (resolution 9) ──────────────────────────────
+    if HAS_H3:
+        import pandas as pd
+
+        @F.pandas_udf("string")
+        def _geo_to_h3(lat: pd.Series, lon: pd.Series) -> pd.Series:
+            import h3
+            return pd.Series(
+                [h3.geo_to_h3(float(la), float(lo), 9) for la, lo in zip(lat, lon)]
+            )
+
+        final = (
+            final
+            .withColumn("h3_origin", _geo_to_h3(F.col("casa_orig_lat"), F.col("casa_orig_lon")))
+            .withColumn("h3_dest",   _geo_to_h3(F.col("casa_dest_lat"), F.col("casa_dest_lon")))
+        )
+        log.info("H3 columns added (resolution 9)")
+    else:
+        log.warning("h3 not available — skipping H3 indexing (pip install h3==3.7.7)")
 
     # ── 6. Write Parquet partitioned by year_month ───────────────────
     log.info("Writing curated trips to %s (partitioned by year_month)", OUTPUT_PATH)

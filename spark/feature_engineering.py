@@ -30,6 +30,7 @@ log = logging.getLogger("FEAT")
 
 INPUT_PATH = "s3a://curated/trips/"
 OUTPUT_PATH = "s3a://mldata/features/"
+ZONE_MAPPING_PATH = "/opt/data/zone_mapping.csv"
 
 
 def build_spark():
@@ -137,6 +138,24 @@ def main():
     log.info("Feature rows after lag filter: %d (dropped %d with null lags)",
              feature_count, demand_count - feature_count)
 
+    # ── 7b. Join zone reference attributes ───────────────────────────
+    log.info("Joining zone attributes (population_density, zone_type)...")
+    zones_ref = (
+        spark.read
+        .option("header", "true")
+        .csv(ZONE_MAPPING_PATH)
+        .select(
+            F.col("zone_id").cast(IntegerType()).alias("zm_zone_id"),
+            F.col("population_density").cast(DoubleType()).alias("population_density"),
+            F.col("zone_type"),
+        )
+    )
+    features = (
+        features
+        .join(F.broadcast(zones_ref), F.col("origin_zone") == F.col("zm_zone_id"), "left")
+        .drop("zm_zone_id")
+    )
+
     # ── 8. Select final feature columns ──────────────────────────────
     feature_matrix = features.select(
         "origin_zone",
@@ -152,6 +171,8 @@ def main():
         "demand_lag_1d",
         "demand_lag_7d",
         "rolling_7d_mean",
+        "population_density",
+        "zone_type",
     )
 
     # ── 9. Write feature matrix ──────────────────────────────────────
@@ -169,16 +190,17 @@ def main():
     log.info("  Input trips:     %d", total)
     log.info("  Demand rows:     %d", demand_count)
     log.info("  Feature rows:    %d", feature_count)
-    log.info("  Zones:           %d", feature_matrix.select("origin_zone").distinct().count())
-    log.info("  Date range:      %s to %s",
-             feature_matrix.agg(F.min("trip_date")).collect()[0][0],
-             feature_matrix.agg(F.max("trip_date")).collect()[0][0])
-    log.info("  Avg demand/slot: %.1f",
-             feature_matrix.agg(F.avg("demand")).collect()[0][0])
-
-    # Show feature stats
-    feature_matrix.describe("demand", "demand_lag_1d", "demand_lag_7d",
-                            "rolling_7d_mean", "supply_demand_ratio").show()
+    try:
+        written = spark.read.parquet(OUTPUT_PATH)
+        log.info("  Zones:           %d", written.select("origin_zone").distinct().count())
+        date_row = written.agg(F.min("trip_date"), F.max("trip_date")).collect()[0]
+        log.info("  Date range:      %s to %s", date_row[0], date_row[1])
+        avg_row = written.agg(F.avg("demand")).collect()[0]
+        log.info("  Avg demand/slot: %.1f", avg_row[0])
+        written.describe("demand", "demand_lag_1d", "demand_lag_7d",
+                         "rolling_7d_mean", "supply_demand_ratio").show()
+    except Exception as e:  # noqa: BLE001
+        log.warning("  Post-write stats skipped: %s", e)
 
     log.info("  Output: %s", OUTPUT_PATH)
     log.info("=== Feature Engineering Complete ===")
