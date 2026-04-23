@@ -1,11 +1,14 @@
 """
 Flink Job 1 — GPS Normalizer
 Reads raw.gps from Kafka, validates coordinates, assigns zones,
-anonymizes lat/lon to centroid, writes to Cassandra + processed.gps Kafka topic.
+anonymizes lat/lon to centroid (with per-taxi jitter for map visibility),
+writes to Cassandra + processed.gps Kafka topic.
 """
 
+import hashlib
 import json
 import logging
+import math
 import time
 from datetime import datetime
 
@@ -102,6 +105,21 @@ class GpsDeduplicator(KeyedProcessFunction):
             logger.error(f"Zone centroid load failed: {e}")
         logger.info(f"Loaded {len(self.h3_lookup)} H3 cells, {len(self.zone_centroids)} zone centroids")
 
+        # Load zone bounds for jitter clamping
+        self.zone_bounds = {}
+        try:
+            with open("/opt/flink/data/zone_mapping.csv", "r") as f2:
+                import csv as csv2
+                reader2 = csv2.DictReader(f2)
+                for row2 in reader2:
+                    zid2 = int(row2["zone_id"])
+                    self.zone_bounds[zid2] = (
+                        float(row2["casa_lat_min"]), float(row2["casa_lat_max"]),
+                        float(row2["casa_lon_min"]), float(row2["casa_lon_max"]),
+                    )
+        except Exception as e:
+            logger.error(f"Zone bounds load failed: {e}")
+
         # Initialize Cassandra connection
         from cassandra.cluster import Cluster
         self.cluster = Cluster([CASSANDRA_HOST], port=CASSANDRA_PORT)
@@ -156,7 +174,7 @@ class GpsDeduplicator(KeyedProcessFunction):
         b = self._bounds
         if not (b[0] <= lat <= b[1] and b[2] <= lon <= b[3]):
             return
-        if speed is not None and speed > 150.0:
+        if speed is not None and (speed < 0 or speed > 150.0):
             return
         if snap_dist_m is not None and float(snap_dist_m) > 333.0:
             return
@@ -171,11 +189,27 @@ class GpsDeduplicator(KeyedProcessFunction):
         if zone_id is None:
             return
 
-        # Anonymize: snap to zone centroid
+        # Anonymize: snap to zone centroid + deterministic jitter per taxi
         centroid = self.zone_centroids.get(zone_id)
         if centroid is None:
             return
         centroid_lat, centroid_lon = centroid
+
+        # Deterministic jitter: hash taxi_id to get a stable offset (~100m radius)
+        # This spreads dots on the map so you can see individual vehicles
+        h = int(hashlib.md5(taxi_id.encode()).hexdigest()[:8], 16)
+        angle = (h % 360) * math.pi / 180.0
+        radius = 0.0008 + (h % 1000) / 1000000.0  # ~80-180m in degrees
+        jitter_lat = radius * math.cos(angle)
+        jitter_lon = radius * math.sin(angle)
+        display_lat = centroid_lat + jitter_lat
+        display_lon = centroid_lon + jitter_lon
+
+        # Clamp to zone bounds to ensure dot stays within zone
+        bounds = self.zone_bounds.get(zone_id)
+        if bounds:
+            display_lat = max(bounds[0], min(bounds[1], display_lat))
+            display_lon = max(bounds[2], min(bounds[3], display_lon))
 
         # Parse canonical event_time
         try:
@@ -183,12 +217,12 @@ class GpsDeduplicator(KeyedProcessFunction):
         except ValueError:
             return
 
-        # Write to Cassandra
+        # Write to Cassandra (async — high throughput path)
         try:
-            self.session.execute(
+            self.session.execute_async(
                 self.insert_stmt,
                 ("casablanca", zone_id, event_time, taxi_id,
-                 centroid_lat, centroid_lon, speed, status, cell)
+                 display_lat, display_lon, speed, status, cell)
             )
         except Exception as e:
             logger.error(f"Cassandra write error: {e}")
@@ -201,6 +235,8 @@ class GpsDeduplicator(KeyedProcessFunction):
             "event_time": event_time_str,
             "centroid_lat": centroid_lat,
             "centroid_lon": centroid_lon,
+            "lat": display_lat,
+            "lon": display_lon,
             "speed_kmh": speed,
             "status": status,
         }
@@ -245,7 +281,7 @@ def main():
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics(INPUT_TOPIC)
         .set_group_id("flink-gps-normalizer")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )

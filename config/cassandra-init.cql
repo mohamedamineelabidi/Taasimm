@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS vehicle_positions (
     h3_index    TEXT,
     PRIMARY KEY ((city, zone_id), event_time, taxi_id)
 ) WITH CLUSTERING ORDER BY (event_time DESC, taxi_id ASC)
-  AND default_time_to_live = 86400;  -- 24h TTL for positions
+  AND default_time_to_live = 86400
+  AND compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': 1, 'compaction_window_unit': 'HOURS'};
 
 -- ──────────────────────────────────────────────
 -- Table 2: trips
@@ -49,6 +50,10 @@ CREATE TABLE IF NOT EXISTS trips (
     dest_zone       INT,
     origin_h3       TEXT,
     dest_h3         TEXT,
+    origin_lat      DOUBLE,
+    origin_lon      DOUBLE,
+    dest_lat        DOUBLE,
+    dest_lon        DOUBLE,
     status          TEXT,
     fare            DOUBLE,
     eta_seconds     INT,
@@ -71,4 +76,5 @@ CREATE TABLE IF NOT EXISTS demand_zones (
     forecast_demand     DOUBLE,
     PRIMARY KEY ((city, zone_id), window_start)
 ) WITH CLUSTERING ORDER BY (window_start DESC)
-  AND default_time_to_live = 604800;  -- 7-day TTL
+  AND default_time_to_live = 604800
+  AND compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': 1, 'compaction_window_unit': 'HOURS'};

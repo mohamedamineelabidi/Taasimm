@@ -121,7 +121,6 @@ services:
       - "9042:9042"
     environment:
       CASSANDRA_CLUSTER_NAME: TaaSimCluster
-      CASSANDRA_DC: dc1
       CASSANDRA_RACK: rack1
       MAX_HEAP_SIZE: 512M
       HEAP_NEWSIZE: 128M
@@ -229,7 +228,7 @@ services:
     hostname: gps-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "vehicle_gps_producer.py", "--max-trips", "200", "--speed", "10"]
+    command: ["python", "vehicle_gps_producer.py", "--mode", "coupled", "--speed", "50", "--fleet-size", "2000"]
     volumes:
       - ./data:/data
     depends_on:
@@ -245,7 +244,7 @@ services:
     hostname: trip-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
-    command: ["python", "trip_request_producer.py", "--max-trips", "500", "--base-rate", "2.0"]
+    command: ["python", "trip_request_producer.py", "--source", "casa_synth", "--speed", "50"]
     volumes:
       - ./data:/data
     depends_on:
@@ -267,13 +266,23 @@ services:
       - "7077:7077"   # Spark master port
       - "4040:4040"   # Spark application UI
     user: root
-    command: /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080
+    command: >
+      /bin/bash -c "pip install --quiet numpy &&
+      /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080"
     environment:
       SPARK_NO_DAEMONIZE: "true"
       SPARK_MASTER_HOST: spark-master
+      SPARK_DRIVER_MEMORY: 2g
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          memory: 1g
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra
+      - ./spark:/opt/spark-jobs
       - ./notebooks:/opt/notebooks
       - ./scripts:/opt/scripts
       - ./data:/opt/data
@@ -291,14 +300,23 @@ services:
     container_name: taasim-spark-worker
     hostname: spark-worker
     user: root
-    command: /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 2g --cores 2
+    command: >
+      /bin/bash -c "pip install --quiet numpy &&
+      /opt/spark/sbin/start-worker.sh spark://spark-master:7077 --memory 4g --cores 2"
     environment:
       SPARK_NO_DAEMONIZE: "true"
-      SPARK_WORKER_MEMORY: 2g
+      SPARK_WORKER_MEMORY: 4g
       SPARK_WORKER_CORES: 2
+    deploy:
+      resources:
+        limits:
+          memory: 5g
+        reservations:
+          memory: 2g
     volumes:
       - ./config/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ./jars/spark:/opt/spark/jars/extra
+      - ./spark:/opt/spark-jobs
       - ./notebooks:/opt/notebooks
       - ./scripts:/opt/scripts
       - ./data:/opt/data
@@ -412,7 +430,35 @@ services:
       - taasim-net
 
   # ──────────────────────────────────────────────
-  # 8. KAFKA UI — Browse topics, messages, consumer groups
+  # 8. API — FastAPI demand forecast + trip reservation
+  # ──────────────────────────────────────────────
+  api:
+    build: ./api
+    container_name: taasim-api
+    hostname: api
+    ports:
+      - "8000:8000"
+    environment:
+      MINIO_ENDPOINT: "http://minio:9000"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MODEL_PATH: "s3a://mldata/models/demand_v1/"
+      CASSANDRA_HOST: cassandra
+      JWT_SECRET: "taasim-secret-key-change-in-production"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - taasim-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # 9. KAFKA UI — Browse topics, messages, consumer groups
   # ──────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest

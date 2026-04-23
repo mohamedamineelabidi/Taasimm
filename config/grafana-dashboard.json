@@ -1,30 +1,217 @@
 {
-  "title": "TaaSim - Vehicle Tracking",
+  "title": "TaaSim — Live Pipeline (Casablanca)",
   "uid": "taasim-vehicles",
   "timezone": "utc",
-  "refresh": "10s",
-  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "date_bucket",
+        "label": "Date Bucket",
+        "type": "custom",
+        "query": "2026-04-21,2026-04-20,2026-04-19,2026-04-18",
+        "current": { "text": "2026-04-21", "value": "2026-04-21" },
+        "options": [
+          { "text": "2026-04-21", "value": "2026-04-21", "selected": true },
+          { "text": "2026-04-20", "value": "2026-04-20", "selected": false },
+          { "text": "2026-04-19", "value": "2026-04-19", "selected": false },
+          { "text": "2026-04-18", "value": "2026-04-18", "selected": false }
+        ]
+      }
+    ]
+  },
   "panels": [
     {
       "id": 1,
       "title": "Vehicle Positions (Live)",
       "type": "geomap",
-      "gridPos": { "h": 16, "w": 16, "x": 0, "y": 0 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "gridPos": {
+        "h": 16,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 200 ALLOW FILTERING"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 15"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 15"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 15"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 15"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 15"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 15"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 15"
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 15"
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 15"
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 15"
+        },
+        {
+          "refId": "K",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 15"
+        },
+        {
+          "refId": "L",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 15"
+        },
+        {
+          "refId": "M",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 15"
+        },
+        {
+          "refId": "N",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 15"
+        },
+        {
+          "refId": "O",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 15"
+        },
+        {
+          "refId": "P",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 15"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
         }
       ],
       "options": {
         "view": {
           "id": "coords",
-          "lat": 33.565,
-          "lon": -7.600,
+          "lat": 33.57,
+          "lon": -7.59,
           "zoom": 12
         },
         "controls": {
@@ -43,10 +230,26 @@
             "config": {
               "showLegend": true,
               "style": {
-                "size": { "fixed": 8 },
-                "color": { "field": "zone_id", "fixed": "green" },
-                "symbol": { "fixed": "circle" },
-                "opacity": 0.8
+                "size": {
+                  "fixed": 10
+                },
+                "color": {
+                  "field": "zone_id",
+                  "fixed": "green"
+                },
+                "symbol": {
+                  "fixed": "circle"
+                },
+                "opacity": 0.85,
+                "text": {
+                  "field": "taxi_id",
+                  "fixed": ""
+                },
+                "textConfig": {
+                  "fontSize": 8,
+                  "offsetX": 0,
+                  "offsetY": -12
+                }
               }
             },
             "location": {
@@ -66,20 +269,183 @@
       "id": 2,
       "title": "Vehicles per Zone",
       "type": "barchart",
-      "gridPos": { "h": 16, "w": 8, "x": 16, "y": 0 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "gridPos": {
+        "h": 16,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, speed, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 100 ALLOW FILTERING"
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 20"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 20"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 20"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 20"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 20"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 20"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 20"
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 20"
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 20"
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 20"
+        },
+        {
+          "refId": "K",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 20"
+        },
+        {
+          "refId": "L",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 20"
+        },
+        {
+          "refId": "M",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 20"
+        },
+        {
+          "refId": "N",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 20"
+        },
+        {
+          "refId": "O",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 20"
+        },
+        {
+          "refId": "P",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 20"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" }
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": []
       },
@@ -88,10 +454,13 @@
         "showValue": "auto",
         "stacking": "none",
         "groupWidth": 0.7,
-        "barWidth": 0.97,
-        "xField": "zone_id"
+        "barWidth": 0.97
       },
       "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "groupBy",
           "options": {
@@ -102,34 +471,322 @@
               },
               "taxi_id": {
                 "operation": "aggregate",
-                "aggregations": ["count"]
+                "aggregations": [
+                  "count"
+                ]
               }
             }
           }
         },
         {
-          "id": "convertFieldType",
+          "id": "organize",
           "options": {
-            "conversions": [
-              { "targetField": "zone_id", "destinationType": "string" }
-            ]
+            "renameByName": {
+              "taxi_id (count)": "vehicle_count"
+            }
           }
         }
       ]
     },
     {
-      "id": 3,
-      "title": "Recent GPS Events",
-      "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "id": 8,
+      "title": "Trip Requests \u2014 Origins (red) & Destinations (blue)",
+      "type": "geomap",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 50 ALLOW FILTERING"
+          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 100"
+        }
+      ],
+      "options": {
+        "view": {
+          "id": "coords",
+          "lat": 33.57,
+          "lon": -7.59,
+          "zoom": 12
+        },
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true
+        },
+        "basemap": {
+          "type": "default",
+          "name": "OpenStreetMap"
+        },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Pickup (origin)",
+            "config": {
+              "showLegend": true,
+              "style": {
+                "size": {
+                  "fixed": 8
+                },
+                "color": {
+                  "fixed": "red"
+                },
+                "symbol": {
+                  "fixed": "circle"
+                },
+                "opacity": 0.8,
+                "text": {
+                  "field": "origin_zone",
+                  "fixed": ""
+                },
+                "textConfig": {
+                  "fontSize": 9,
+                  "offsetX": 0,
+                  "offsetY": -10
+                }
+              }
+            },
+            "location": {
+              "mode": "coords",
+              "latitude": "origin_lat",
+              "longitude": "origin_lon"
+            }
+          },
+          {
+            "type": "markers",
+            "name": "Dropoff (destination)",
+            "config": {
+              "showLegend": true,
+              "style": {
+                "size": {
+                  "fixed": 7
+                },
+                "color": {
+                  "fixed": "blue"
+                },
+                "symbol": {
+                  "fixed": "triangle"
+                },
+                "opacity": 0.7
+              }
+            },
+            "location": {
+              "mode": "coords",
+              "latitude": "dest_lat",
+              "longitude": "dest_lon"
+            }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Recent GPS Events",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 5"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 5"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 5"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 5"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 5"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 5"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 5"
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 5"
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 5"
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 5"
+        },
+        {
+          "refId": "K",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 5"
+        },
+        {
+          "refId": "L",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 5"
+        },
+        {
+          "refId": "M",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 5"
+        },
+        {
+          "refId": "N",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 5"
+        },
+        {
+          "refId": "O",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 5"
+        },
+        {
+          "refId": "P",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 5"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "event_time",
+                "desc": true
+              }
+            ]
+          }
         }
       ],
       "fieldConfig": {
@@ -138,36 +795,235 @@
       },
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "event_time", "desc": true }]
+        "footer": {
+          "show": true,
+          "countRows": true,
+          "reducer": [
+            "count"
+          ]
+        }
       }
     },
     {
       "id": 4,
       "title": "Demand vs Supply by Zone",
       "type": "barchart",
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 26 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 100 ALLOW FILTERING"
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=1 LIMIT 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=2 LIMIT 1"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=3 LIMIT 1"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=4 LIMIT 1"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=5 LIMIT 1"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=6 LIMIT 1"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=7 LIMIT 1"
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=8 LIMIT 1"
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=9 LIMIT 1"
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=10 LIMIT 1"
+        },
+        {
+          "refId": "K",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=11 LIMIT 1"
+        },
+        {
+          "refId": "L",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=12 LIMIT 1"
+        },
+        {
+          "refId": "M",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=13 LIMIT 1"
+        },
+        {
+          "refId": "N",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=14 LIMIT 1"
+        },
+        {
+          "refId": "O",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=15 LIMIT 1"
+        },
+        {
+          "refId": "P",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=16 LIMIT 1"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" }
+          "color": {
+            "mode": "palette-classic"
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "active_vehicles (lastNotNull)" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "active_vehicles"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Supply (vehicles)"
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "pending_requests (lastNotNull)" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "pending_requests"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Demand (requests)"
+              }
+            ]
           }
         ]
       },
@@ -177,25 +1033,46 @@
         "barWidth": 0.8,
         "showValue": "auto",
         "stacking": "none",
-        "xField": "zone_id"
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
       "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "groupBy",
           "options": {
             "fields": {
-              "zone_id": { "operation": "groupby", "aggregations": [] },
-              "active_vehicles": { "operation": "aggregate", "aggregations": ["lastNotNull"] },
-              "pending_requests": { "operation": "aggregate", "aggregations": ["lastNotNull"] }
+              "zone_id": {
+                "operation": "groupby",
+                "aggregations": []
+              },
+              "active_vehicles": {
+                "operation": "aggregate",
+                "aggregations": [
+                  "sum"
+                ]
+              },
+              "pending_requests": {
+                "operation": "aggregate",
+                "aggregations": [
+                  "sum"
+                ]
+              }
             }
           }
         },
         {
-          "id": "convertFieldType",
+          "id": "organize",
           "options": {
-            "conversions": [
-              { "targetField": "zone_id", "destinationType": "string" }
-            ]
+            "renameByName": {
+              "active_vehicles (sum)": "active_vehicles",
+              "pending_requests (sum)": "pending_requests"
+            }
           }
         }
       ]
@@ -204,42 +1081,305 @@
       "id": 5,
       "title": "Demand Zone Details",
       "type": "table",
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 26 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id IN (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) LIMIT 50 ALLOW FILTERING"
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=1 LIMIT 5"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=2 LIMIT 5"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=3 LIMIT 5"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=4 LIMIT 5"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=5 LIMIT 5"
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=6 LIMIT 5"
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=7 LIMIT 5"
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=8 LIMIT 5"
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=9 LIMIT 5"
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=10 LIMIT 5"
+        },
+        {
+          "refId": "K",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=11 LIMIT 5"
+        },
+        {
+          "refId": "L",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=12 LIMIT 5"
+        },
+        {
+          "refId": "M",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=13 LIMIT 5"
+        },
+        {
+          "refId": "N",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=14 LIMIT 5"
+        },
+        {
+          "refId": "O",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=15 LIMIT 5"
+        },
+        {
+          "refId": "P",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT zone_id, active_vehicles, pending_requests, ratio, window_start FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=16 LIMIT 5"
         }
       ],
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "window_start",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "window_start", "desc": true }]
+        "footer": {
+          "show": true,
+          "countRows": true,
+          "reducer": [
+            "count"
+          ]
+        }
       }
     },
     {
       "id": 6,
       "title": "Trip Matching Results",
       "type": "table",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 36 },
-      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "datasource": {
+        "type": "hadesarchitect-cassandra-datasource",
+        "uid": "cassandra-ds"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-18' LIMIT 50 ALLOW FILTERING"
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "hadesarchitect-cassandra-datasource",
+            "uid": "cassandra-ds"
+          },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 50"
         }
       ],
-      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "created_at",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "matched": {
+                        "text": "MATCHED",
+                        "color": "green"
+                      },
+                      "no_vehicle": {
+                        "text": "NO VEHICLE",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
       "options": {
         "showHeader": true,
-        "sortBy": [{ "displayName": "created_at", "desc": true }]
+        "footer": {
+          "show": true,
+          "countRows": true,
+          "reducer": [
+            "count"
+          ]
+        }
       }
     }
   ]

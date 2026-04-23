@@ -9,3 +9,4 @@ Since your goal is to respect "logic boundaries," you should use a Hidden Markov
 Measurement Probability: How close is the GPS point to a road?
 
 Transition Probability: Does the move from Point A to Point B make sense? (e.g., a taxi can't teleport across a block or drive through a wall).
+

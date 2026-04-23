@@ -5,6 +5,14 @@ Generates simulated taxi trip-request events and publishes them to Kafka
 topic ``raw.trips``.  The emission rate follows Porto's hourly demand curve
 with peak multipliers at morning (7–9h) and evening (17–19h) rush hours.
 
+Cahier des charges §2.2 + §2.3 compliance:
+- NYC TLC data is **never** streamed by this producer (§2.2).  What streams is
+  Casa-native trip events synthesised offline from an NYC *fingerprint* +
+  HCP/Glovo spatial priors (see documents/13 §5).
+- Twin-peak demand curve (08:00 and 18:00) + Fri-high / Sun-low DoW pattern
+  matches §2.3 specification.
+- Call type distribution A/B/C matches Porto (§2.1).
+
 Features:
 - Hourly demand multiplier (derived from Porto EDA)
 - Peak hours 7–9, 17–19 at 3–5× base rate
@@ -19,6 +27,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import random
 import sys
 import time
@@ -30,6 +39,7 @@ from kafka import KafkaProducer
 from config import (
     KAFKA_BOOTSTRAP,
     TOPIC_TRIPS,
+    PHASE4_TRIPS_PARQUET,
     load_zone_mapping,
     assign_zone,
     load_h3_lookup,
@@ -72,9 +82,6 @@ HOURLY_MULTIPLIER = [
 ]
 
 # Call type distribution (Porto: B=48%, C=40%, A=12%)
-CALL_TYPES = ["A", "B", "B", "B", "B", "C", "C", "C", "C"]
-# Weighted sampling: 4/9 B ≈ 44%, 4/9 C ≈ 44%, 1/9 A ≈ 11%
-# Closer match via explicit weights:
 CALL_TYPE_WEIGHTS = {"A": 0.12, "B": 0.48, "C": 0.40}
 
 
@@ -148,11 +155,11 @@ def run(max_trips, base_rate):
             trip_id = str(uuid.uuid4())
             rider_id = f"rider_{random.randint(1, rider_pool_size):05d}"
 
-            # Compute centroids and H3 cells for origin/destination
-            o_lat = (origin_zone["lat_min"] + origin_zone["lat_max"]) / 2
-            o_lon = (origin_zone["lon_min"] + origin_zone["lon_max"]) / 2
-            d_lat = (dest_zone["lat_min"] + dest_zone["lat_max"]) / 2
-            d_lon = (dest_zone["lon_min"] + dest_zone["lon_max"]) / 2
+            # Randomize coordinates within zone bounds (not always centroid)
+            o_lat = random.uniform(origin_zone["lat_min"], origin_zone["lat_max"])
+            o_lon = random.uniform(origin_zone["lon_min"], origin_zone["lon_max"])
+            d_lat = random.uniform(dest_zone["lat_min"], dest_zone["lat_max"])
+            d_lon = random.uniform(dest_zone["lon_min"], dest_zone["lon_max"])
             _, _, origin_h3 = assign_h3_zone(o_lat, o_lon, h3_lookup)
             _, _, dest_h3 = assign_h3_zone(d_lat, d_lon, h3_lookup)
 
@@ -191,11 +198,112 @@ def run(max_trips, base_rate):
         log.info("=== DONE === Sent %d trip request events", sent)
 
 
+def run_from_parquet(parquet_path, max_trips, speed):
+    """Replay Phase-4 Casa synth trip requests at wall-clock rebased cadence.
+
+    Reads casa_trip_requests.parquet (500k rows, 90 days), sorts by request_time,
+    rebases offset = now - min(request_time), and sleeps between events to reproduce
+    the 08/13/19 Casa demand peaks at `speed`x real time.
+    """
+    import pandas as pd
+
+    if not os.path.exists(parquet_path):
+        log.error("Parquet not found: %s", parquet_path)
+        sys.exit(1)
+    log.info("Loading %s", parquet_path)
+    df = pd.read_parquet(parquet_path)
+    df = df.sort_values("request_time").reset_index(drop=True)
+    if max_trips:
+        df = df.head(max_trips)
+    log.info("Loaded %d rows (%s -> %s)", len(df), df["request_time"].min(), df["request_time"].max())
+
+    zones = {z["zone_id"]: z for z in load_zone_mapping()}
+    h3_lookup = load_h3_lookup()
+
+    # Wall-clock rebase: make first trip fire ~now
+    t0_src = df["request_time"].iloc[0].to_pydatetime()
+    t0_wall = datetime.now(timezone.utc)
+    log.info("Rebase: src=%s -> wall=%s (speed=%.1fx)", t0_src, t0_wall, speed)
+
+    producer = create_producer()
+    log.info("Connected to Kafka at %s | topic=%s", KAFKA_BOOTSTRAP, TOPIC_TRIPS)
+
+    sent = 0
+    rider_pool = 5000
+    try:
+        for row in df.itertuples(index=False):
+            # Scheduled wall-clock emit time
+            dt_src = (row.request_time.to_pydatetime() - t0_src).total_seconds()
+            wall_target = t0_wall.timestamp() + dt_src / speed
+            lag = wall_target - datetime.now(timezone.utc).timestamp()
+            if lag > 0:
+                time.sleep(lag)
+
+            o = zones.get(int(row.origin_zone_id))
+            d = zones.get(int(row.dest_zone_id))
+            if o is None or d is None:
+                continue
+            o_lat = random.uniform(o["lat_min"], o["lat_max"])
+            o_lon = random.uniform(o["lon_min"], o["lon_max"])
+            d_lat = random.uniform(d["lat_min"], d["lat_max"])
+            d_lon = random.uniform(d["lon_min"], d["lon_max"])
+            _, _, o_h3 = assign_h3_zone(o_lat, o_lon, h3_lookup)
+            _, _, d_h3 = assign_h3_zone(d_lat, d_lon, h3_lookup)
+
+            now = datetime.now(timezone.utc)
+            rider_id = f"rider_{random.randint(1, rider_pool):05d}"
+            event = {
+                "trip_id": str(row.trip_id),
+                "rider_id": rider_id,
+                "origin_zone": int(row.origin_zone_id),
+                "origin_zone_name": str(row.origin_zone_name),
+                "origin_class": str(row.origin_class),
+                "origin_lat": round(o_lat, 6),
+                "origin_lon": round(o_lon, 6),
+                "origin_h3": o_h3,
+                "destination_zone": int(row.dest_zone_id),
+                "dest_zone_name": str(row.dest_zone_name),
+                "dest_class": str(row.dest_class),
+                "dest_lat": round(d_lat, 6),
+                "dest_lon": round(d_lon, 6),
+                "dest_h3": d_h3,
+                "passenger_count": int(row.passenger_count),
+                "distance_km": float(row.distance_km),
+                "duration_s": int(row.duration_s),
+                "fleet_type": str(row.fleet_type),
+                "fare_mad": float(row.fare_mad),
+                "call_type": str(row.call_type),
+                "event_time": now.isoformat(),
+                "source": "casa_synth_v1",
+            }
+            producer.send(TOPIC_TRIPS, key=rider_id, value=event)
+            sent += 1
+            if sent % 100 == 0:
+                log.info("Sent %d trips (hour=%d, last_zone=%d->%s, fare=%.1f MAD, %s)",
+                         sent, now.hour, int(row.origin_zone_id),
+                         int(row.dest_zone_id), float(row.fare_mad), str(row.fleet_type))
+    except KeyboardInterrupt:
+        log.info("Interrupted by user")
+    finally:
+        producer.flush()
+        producer.close()
+        log.info("=== DONE === Replayed %d trip request events from parquet", sent)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TaaSim Trip Request Producer")
+    parser.add_argument("--source", choices=["casa_synth", "random"], default="casa_synth",
+                        help="casa_synth: replay Phase-4 parquet (default). random: legacy synthetic.")
     parser.add_argument("--max-trips", type=int, default=None,
-                        help="Max trip requests to generate (default: run forever)")
+                        help="Max trip requests to emit (default: run through all rows)")
     parser.add_argument("--base-rate", type=float, default=2.0,
-                        help="Base trip request rate in events/sec (default: 2.0)")
+                        help="[random mode] Base trip request rate in events/sec (default: 2.0)")
+    parser.add_argument("--speed", type=float, default=10.0,
+                        help="[casa_synth mode] Replay speed multiplier (default: 10x)")
+    parser.add_argument("--parquet", default=PHASE4_TRIPS_PARQUET,
+                        help="[casa_synth mode] Path to trip-requests parquet")
     args = parser.parse_args()
-    run(args.max_trips, args.base_rate)
+    if args.source == "casa_synth":
+        run_from_parquet(args.parquet, args.max_trips, args.speed)
+    else:
+        run(args.max_trips, args.base_rate)

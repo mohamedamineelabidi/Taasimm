@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pyflink.datastream import StreamExecutionEnvironment, RuntimeExecutionMode
 from pyflink.datastream.functions import KeyedProcessFunction, FlatMapFunction, RuntimeContext
 from pyflink.datastream.state import MapStateDescriptor, StateTtlConfig
-from pyflink.common import WatermarkStrategy, Types, Time
+from pyflink.common import WatermarkStrategy, Types, Time, Duration
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream.connectors.kafka import (
     KafkaSource, KafkaSink, KafkaRecordSerializationSchema,
@@ -148,8 +148,10 @@ class TripMatcherFunction(KeyedProcessFunction):
                 """
                 INSERT INTO trips
                     (city, date_bucket, created_at, trip_id, rider_id, taxi_id,
-                     origin_zone, dest_zone, status, fare, eta_seconds, origin_h3, dest_h3)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     origin_zone, dest_zone, status, fare, eta_seconds,
+                     origin_h3, dest_h3, origin_lat, origin_lon, dest_lat, dest_lon)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                IF NOT EXISTS
                 """
             )
             logger.info("Cassandra connected in TripMatcherFunction")
@@ -273,13 +275,19 @@ class TripMatcherFunction(KeyedProcessFunction):
         if not self._cassandra_session:
             return
         try:
-            now = datetime.now(timezone.utc)
+            # Use request event_time (not processing time) as created_at
+            event_time_str = event.get("event_time", "")
+            if event_time_str:
+                created_at = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
+            else:
+                created_at = datetime.now(timezone.utc)
+            date_bucket = created_at.strftime("%Y-%m-%d")
             self._cassandra_session.execute(
                 self._trip_insert_stmt,
                 (
                     CITY,
-                    now.strftime("%Y-%m-%d"),
-                    now,
+                    date_bucket,
+                    created_at,
                     uuid.UUID(event.get("trip_id", str(uuid.uuid4()))),
                     event.get("rider_id", "unknown"),
                     taxi_id,
@@ -290,6 +298,10 @@ class TripMatcherFunction(KeyedProcessFunction):
                     int(eta_seconds),
                     event.get("origin_h3"),
                     event.get("dest_h3"),
+                    float(event.get("origin_lat", 0)),
+                    float(event.get("origin_lon", 0)),
+                    float(event.get("dest_lat", 0)),
+                    float(event.get("dest_lon", 0)),
                 )
             )
         except Exception as e:
@@ -301,16 +313,22 @@ class TripMatcherFunction(KeyedProcessFunction):
         if not self._cassandra_session:
             return
         try:
-            now = datetime.now(timezone.utc)
+            # Use request event_time (not processing time) as created_at
+            event_time_str = event.get("event_time", "")
+            if event_time_str:
+                created_at = datetime.fromisoformat(event_time_str.replace("Z", "+00:00"))
+            else:
+                created_at = datetime.now(timezone.utc)
+            date_bucket = created_at.strftime("%Y-%m-%d")
             self._cassandra_session.execute(
                 self._trip_insert_stmt,
                 (
                     CITY,
-                    now.strftime("%Y-%m-%d"),
-                    now,
+                    date_bucket,
+                    created_at,
                     uuid.UUID(event.get("trip_id", str(uuid.uuid4()))),
                     event.get("rider_id", "unknown"),
-                    "unmatched",
+                    "",
                     zone_id,
                     event.get("destination_zone", 0),
                     "no_vehicle",
@@ -318,6 +336,10 @@ class TripMatcherFunction(KeyedProcessFunction):
                     0,
                     event.get("origin_h3"),
                     event.get("dest_h3"),
+                    float(event.get("origin_lat", 0)),
+                    float(event.get("origin_lon", 0)),
+                    float(event.get("dest_lat", 0)),
+                    float(event.get("dest_lon", 0)),
                 )
             )
         except Exception as e:
@@ -370,15 +392,25 @@ def main():
     env.get_checkpoint_config().set_checkpointing_mode(CheckpointingMode.EXACTLY_ONCE)
     env.get_checkpoint_config().set_min_pause_between_checkpoints(30_000)
 
-    gps_wm = WatermarkStrategy.for_monotonous_timestamps()
-    trip_wm = WatermarkStrategy.for_monotonous_timestamps()
+    gps_wm = (
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(10))
+        .with_timestamp_assigner(GpsTimestampAssigner())
+        .with_idleness(Duration.of_seconds(15))
+    )
+    trip_wm = (
+        WatermarkStrategy
+        .for_bounded_out_of_orderness(Duration.of_seconds(10))
+        .with_timestamp_assigner(TripTimestampAssigner())
+        .with_idleness(Duration.of_seconds(15))
+    )
 
     gps_source = (
         KafkaSource.builder()
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics("processed.gps")
         .set_group_id("trip-matcher-gps")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )
@@ -388,7 +420,7 @@ def main():
         .set_bootstrap_servers(KAFKA_BOOTSTRAP)
         .set_topics("raw.trips")
         .set_group_id("trip-matcher-trips")
-        .set_starting_offsets(KafkaOffsetsInitializer.latest())
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
         .set_value_only_deserializer(SimpleStringSchema())
         .build()
     )
