@@ -150,3 +150,28 @@ Submitting jobs: 1, 2, 3
 ---
 
 **Verification Completed**: ✅ 2026-04-17 01:18 UTC
+
+---
+
+## GPS Anonymization Audit (cahier §6.3)
+
+**Requirement**: *"In Flink Job 1: snap raw lat/lon to zone centroid before writing to Cassandra. Raw coordinates never persisted."*
+
+### Implementation evidence
+
+- File: link/jobs/gps_normalizer.py — docstring: *"anonymizes lat/lon to centroid (with per-taxi jitter for map visibility)"*
+- Write path: the only INSERT INTO taasim.vehicle_positions call uses the centroid-snapped lat/lon computed from `zones.lookup(zone_id).centroid_lat/lon` + deterministic per-taxi jitter (<= 50 m) purely for Grafana readability.
+- Raw `lat_raw` / `lon_raw` fields from the Kafka payload are consumed inside the Flink operator and **discarded** — they never appear in any Cassandra write, nor in the `processed.gps` output topic.
+
+### Verification query
+
+```powershell
+docker exec taasim-cassandra cqlsh -e `
+  "SELECT DISTINCT lat, lon FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 20;"
+```
+
+Expected: every (lat, lon) tuple returned is one of the 16 zone centroids (plus <= 50 m deterministic jitter). No raw GPS trail survives.
+
+### Conclusion
+
+Anonymization is enforced at the Flink layer, not at Cassandra — raw coordinates are processed in-memory only and never leave the Flink operator.

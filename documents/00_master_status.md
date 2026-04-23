@@ -58,6 +58,30 @@ Project: TaaSim (Transport as a Service) - Casablanca
 - [10_week6_ml_pipeline.md](10_week6_ml_pipeline.md) ← Week 6 ML Pipeline Report
 - [09_week5_spark_etl.md](09_week5_spark_etl.md) ← Week 5 Spark ETL Report
 
+## Cahier-des-charges Compliance Matrix
+
+One row per grading-relevant cahier section. Status reflects current state on `test-workflow-dev`.
+
+| Cahier § | Requirement | Implementation | Doc | Status |
+|---|---|---|---|---|
+| §2.1 | Porto → Casa linear transform + 22→16 zone remap | Phase 2 step 4 affine warp; 16 zones in `zone_mapping_v4.csv` | [13_remapping_and_synthesis_deep_dive.md](13_remapping_and_synthesis_deep_dive.md) §0, §4 | ✅ |
+| §2.2 | NYC = batch only, never streamed | NYC Parquet read by Spark ETL (Week 5) and as offline fingerprint (Phase 3); never reaches Kafka | [13](13_remapping_and_synthesis_deep_dive.md) §5.1 box | ✅ |
+| §2.3 | Lightweight simulator, ±20 m drift, 5% blackout, out-of-order up to 3 min | Producer emits Gaussian jitter σ≈20 m + 5% blackout (60–180 s late) | [05_task_kafka_producers.md](05_task_kafka_producers.md) | ✅ |
+| §3.3 | Three Flink jobs, event-time watermarks, RocksDB, MinIO checkpoints | Jobs 1/2/3 running, 60 s checkpoint cadence, 3-min allowed lateness | [08_week3_completion.md](08_week3_completion.md) | ✅ |
+| §4.1 | Cassandra: 3 tables with partition-key justification | `cassandra-init.cql` + ADR | [07_adr_v1.md](07_adr_v1.md) | ✅ |
+| §4.2 | MinIO zones raw/curated/mldata/kafka-archive | All four buckets active | [06_task_week2_storage.md](06_task_week2_storage.md) | ✅ |
+| §5.3 | ML GBT must beat naive 7-day-lag baseline; baseline-vs-model table | RMSE 3.71 vs 6.84 (45.8% improvement) | [10_week6_ml_pipeline.md](10_week6_ml_pipeline.md) | ✅ |
+| §6.1 | SLA targets (< 5 s match P95, < 15 s GPS freshness, …) | Measured live: match P95 ≈ 1.2 s, GPS freshness ≈ 4 s | [10_week6_ml_pipeline.md](10_week6_ml_pipeline.md) + Grafana | ✅ |
+| §6.3 | GPS anonymization — centroid snap before Cassandra write | Flink Job 1 snaps to `zone.centroid_lat/lon`; raw lat/lon never persisted | [08_week3_completion.md](08_week3_completion.md) anonymization audit | ✅ |
+| §6.3 | FastAPI JWT auth, 2 roles | `api/main.py` implements `rider` + `admin` roles, HS256, 24 h | [10_week6_ml_pipeline.md](10_week6_ml_pipeline.md) | ✅ |
+| §6.3 | Kafka topic ACLs (raw.* producers, processed.* admin) | ⚠ Week 7 pending | — | 🟡 Pending |
+| Week 7 | Checkpoint-recovery demo (kill TM, job resumes) | ⚠ Recording pending | — | 🟡 Pending |
+| Week 8 | Live demo + pitch deck + technical report | Draft presentation [12_presentation_week6.md] exists | — | 🟡 Pending |
+
+**Beyond-cahier extensions** (none cross the Kappa boundary): OSRM routing, A–E tier system, HCP/Glovo spatial weights, trajectory index, Phase 3 NYC fingerprint synthesis. Documented in [13 §11](13_remapping_and_synthesis_deep_dive.md#11-beyond-the-cahier--what-we-added-and-why-it-is-still-in-scope).
+
+---
+
 ## Current State Summary
 
 - 16 Docker containers running (Kafka, Kafka Connect, Kafka UI, MinIO, Cassandra, Flink JM + 3 TMs scaled, Spark, Grafana, Jupyter + init containers)

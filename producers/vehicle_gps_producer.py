@@ -4,6 +4,15 @@ TaaSim — Vehicle GPS Producer
 Replays taxi trajectories at configurable speed (default 10×) and publishes
 to Kafka topic ``raw.gps``.
 
+Cahier des charges §2.3 compliance:
+- Emits ±20 m Gaussian GPS drift (``jitter_deg`` ~ 0.00018°) — spec-compliant.
+- 5% blackout probability re-emits delayed pings 60–180 s late — spec-compliant
+  (creates the out-of-order events that Flink Job 1's 3-min watermark handles).
+- Default speed 50× is higher than the cahier's 10× baseline to saturate a
+  2000-taxi fleet during demo; ``--speed 10`` reverts to the spec value.
+- No raw coordinates are persisted by this producer — anonymization happens
+  in Flink Job 1 (cahier §6.3).
+
 Modes:
 - **live** (default): Read Porto CSVs, apply linear bbox transform + noise + road snap
 - **curated**: Replay pre-projected road-matched trajectories from Parquet

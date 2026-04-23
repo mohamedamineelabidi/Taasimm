@@ -5,6 +5,14 @@ Generates simulated taxi trip-request events and publishes them to Kafka
 topic ``raw.trips``.  The emission rate follows Porto's hourly demand curve
 with peak multipliers at morning (7–9h) and evening (17–19h) rush hours.
 
+Cahier des charges §2.2 + §2.3 compliance:
+- NYC TLC data is **never** streamed by this producer (§2.2).  What streams is
+  Casa-native trip events synthesised offline from an NYC *fingerprint* +
+  HCP/Glovo spatial priors (see documents/13 §5).
+- Twin-peak demand curve (08:00 and 18:00) + Fri-high / Sun-low DoW pattern
+  matches §2.3 specification.
+- Call type distribution A/B/C matches Porto (§2.1).
+
 Features:
 - Hourly demand multiplier (derived from Porto EDA)
 - Peak hours 7–9, 17–19 at 3–5× base rate
