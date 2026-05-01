@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Équipe TaaSim · ENSAH 2025–2026" />
+  <title>TaaSim — Semaine N : [Titre de la tâche]</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">TaaSim — Semaine N : [Titre de la tâche]</h1>
+<p class="author">Équipe TaaSim · ENSAH 2025–2026</p>
+<p class="date">27 Avril 2026</p>
+</header>
+<h2 id="objectif">Objectif</h2>
+<p>Décrivez ici l’objectif principal de ce sprint/tâche en 2–3 phrases.
+Quel problème résout-on ?</p>
+<blockquote>
+<p><strong>Contexte</strong> : Cette tâche s’inscrit dans l’architecture
+Kappa de TaaSim. Kafka est la source de vérité unique. Flink gère tout
+le traitement temps réel.</p>
+</blockquote>
+<hr />
+<h2 id="ce-qui-a-été-fait">Ce qui a été fait</h2>
+<h3 id="sous-tâche-a">1. Sous-tâche A</h3>
+<p>Description courte de ce qui a été implémenté.</p>
+<ul>
+<li><strong>Fichier</strong> :
+<code>flink/jobs/gps_normalizer.py</code></li>
+<li><strong>Input</strong> : topic <code>raw.gps</code></li>
+<li><strong>Output</strong> : Cassandra <code>vehicle_positions</code> +
+topic <code>processed.gps</code></li>
+</ul>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Exemple de code clé</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>env.from_source(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    source<span class="op">=</span>KafkaSource.builder()</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        .set_topics(<span class="st">&quot;raw.gps&quot;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>        .build(),</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    watermark_strategy<span class="op">=</span>WatermarkStrategy</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        .for_bounded_out_of_orderness(Duration.of_minutes(<span class="dv">3</span>))</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<h3 id="sous-tâche-b">2. Sous-tâche B</h3>
+<p>Description de la deuxième composante.</p>
+<table>
+<thead>
+<tr>
+<th>Paramètre</th>
+<th>Valeur</th>
+<th>Justification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Checkpoint interval</td>
+<td>60s</td>
+<td>Balance latence / recovery</td>
+</tr>
+<tr>
+<td>State backend</td>
+<td>RocksDB</td>
+<td>Volume d’état &gt; RAM disponible</td>
+</tr>
+<tr>
+<td>Allowed lateness</td>
+<td>3 min</td>
+<td>Couvre le drift GPS 5% blackout</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="résultats-mesurés">Résultats mesurés</h2>
+<table>
+<thead>
+<tr>
+<th>Métrique</th>
+<th>Valeur obtenue</th>
+<th>Cible SLA</th>
+<th>Statut</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latence P95</td>
+<td>≈ 1.2 s</td>
+<td>&lt; 5 s</td>
+<td><strong>✅ OK</strong></td>
+</tr>
+<tr>
+<td>Fraîcheur GPS</td>
+<td>≈ 4 s</td>
+<td>&lt; 15 s</td>
+<td><strong>✅ OK</strong></td>
+</tr>
+<tr>
+<td>Taux de match</td>
+<td>~21%</td>
+<td>—</td>
+<td><strong>🟡 Voir note</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Note</strong> : Le taux de 21% s’explique par la densité de
+simulation — les taxis n’émettent du GPS que pendant les trajets
+actifs.</p>
+</blockquote>
+<hr />
+<h2 id="décisions-techniques-adr">Décisions techniques (ADR)</h2>
+<h3 id="choix-rocksdb-vs-fsstatebackend">Choix : RocksDB vs
+FsStateBackend</h3>
+<p><strong>Décision</strong> : RocksDB<br />
+<strong>Raison</strong> : L’état de déduplication GPS (2000 véhicules ×
+pings 4s) dépasse la RAM disponible dans le conteneur Flink (512 MiB).
+RocksDB persiste sur disque avec checkpointing vers MinIO.</p>
+<p><strong>Alternative rejetée</strong> : FsStateBackend — trop gourmand
+en mémoire pour un déploiement mono-broker.</p>
+<hr />
+<h2 id="checklist-de-validation">Checklist de validation</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Job Flink soumis et
+RUNNING (<code>flink/jobs/</code>)</label></li>
+<li><label><input type="checkbox" checked="" />Données visibles dans
+Cassandra
+(<code>cqlsh -e "SELECT * FROM taasim.vehicle_positions LIMIT 5;"</code>)</label></li>
+<li><label><input type="checkbox" checked="" />Topic
+<code>processed.gps</code> actif (Kafka UI :
+<code>localhost:9001</code>)</label></li>
+<li><label><input type="checkbox" checked="" />Dashboard Grafana mis à
+jour (Geomap + table)</label></li>
+<li><label><input type="checkbox" />Tests de latence end-to-end
+documentés</label></li>
+<li><label><input type="checkbox" />Commit + push avec message
+<code>[task-N] description</code></label></li>
+</ul>
+<hr />
+<h2 id="commandes-de-vérification">Commandes de vérification</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Vérifier les jobs Flink</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">curl</span> http<span class="op">://</span>localhost<span class="op">:</span><span class="dv">8081</span><span class="op">/</span>jobs</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Vérifier Cassandra</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>docker exec taasim-cassandra cqlsh <span class="op">-</span>e <span class="st">&quot;USE taasim; SELECT COUNT(*) FROM vehicle_positions;&quot;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Vérifier les topics Kafka</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>docker exec taasim-kafka <span class="op">/</span>opt<span class="op">/</span>kafka<span class="op">/</span>bin<span class="op">/</span>kafka-topics<span class="op">.</span><span class="fu">sh</span> <span class="op">--</span>bootstrap-server localhost<span class="op">:</span><span class="dv">9092</span> <span class="op">--</span>list</span></code></pre></div>
+<hr />
+<h2 id="prochaines-étapes">Prochaines étapes</h2>
+<ol type="1">
+<li><strong>Semaine suivante</strong> — description de ce qui vient
+après</li>
+<li><strong>Blocker identifié</strong> — si applicable</li>
+<li><strong>Dette technique</strong> — si applicable</li>
+</ol>
+<hr />
+<p><em>Rapport généré depuis <code>documents/semaine-N-titre.md</code> ·
+TaaSim Capstone ENSAH 2025–2026</em></p>
+</body>
+</html>

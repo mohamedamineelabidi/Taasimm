@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>11_data_pipeline_architecture</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<h1 id="taasim-data-pipeline-remapping-architecture">TaaSim — Data
+Pipeline &amp; Remapping Architecture</h1>
+<blockquote>
+<p><strong>Purpose</strong>: Single source of truth for every dataset,
+every transform, and every artifact used to turn raw international taxi
+traces into a realistic Casablanca mobility simulation.</p>
+<p><strong>Scope</strong>: Phase 1 (zones v4) → Phase 2 (Porto
+trajectory warping v4) → Phase 3 (NYC → Casa trip synthesis) → Phase 4
+(runtime coupling).</p>
+<p>Last updated: 2026-04-22.</p>
+</blockquote>
+<hr />
+<h2 id="why-remap-at-all">0. Why remap at all?</h2>
+<p>TaaSim needs a <strong>live</strong> urban-mobility pipeline for
+Casablanca (16 arrondissements, ~3.3 M people). No open taxi dataset
+exists for Casa, so we synthesise one by combining three complementary
+international sources with local calibration data:</p>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 26%" />
+<col style="width: 30%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr>
+<th>We need</th>
+<th>We don’t have</th>
+<th>We use instead</th>
+<th>Why it works</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Realistic <strong>motion</strong> (GPS polylines along real
+streets)</td>
+<td>Casa GPS traces</td>
+<td><strong>Porto</strong> taxi dataset (1.7 M trips, dense
+polylines)</td>
+<td>Same street-network topology class (dense European/Mediterranean
+grid)</td>
+</tr>
+<tr>
+<td>Realistic <strong>demand temporal fingerprint</strong> (24 h curve,
+day-of-week, OD structure)</td>
+<td>Casa trip requests</td>
+<td><strong>NYC TLC</strong> Q1 2023 (~3 M trips)</td>
+<td>Preserves peak-hour shape, same-zone ratio, duration law</td>
+</tr>
+<tr>
+<td>Realistic <strong>spatial weights</strong> per zone (who rides
+where)</td>
+<td>—</td>
+<td><strong>HCP 2024</strong> population + <strong>Glovo</strong>
+commerce H3 cells + <strong>OSM</strong> transit</td>
+<td>Official census + observed economic activity + transit
+accessibility</td>
+</tr>
+</tbody>
+</table>
+<p>Everything else is just transforming, blending, and indexing these
+sources.</p>
+<hr />
+<h2 id="raw-data-inventory">1. Raw Data Inventory</h2>
+<h3 id="international-traces-motion-temporal">1.1 International traces
+(motion + temporal)</h3>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 20%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Location</th>
+<th>Size</th>
+<th>Role</th>
+<th>Tracked in Git?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Porto taxi</strong></td>
+<td><a href="../data/train.csv">data/train.csv</a></td>
+<td>1.8 GiB (~1.7 M trips)</td>
+<td>Source of GPS polylines</td>
+<td>No (MinIO)</td>
+</tr>
+<tr>
+<td><strong>NYC TLC Q1 2023</strong></td>
+<td><a href="../data/nyc-tlc/">data/nyc-tlc/</a></td>
+<td>~150 MiB (3 months Parquet)</td>
+<td>Demand fingerprint donor</td>
+<td>No (MinIO)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="morocco-calibration-layers">1.2 Morocco calibration layers</h3>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 20%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Location</th>
+<th>Size</th>
+<th>Role</th>
+<th>Tracked in Git?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HCP RGPH 2024 indicators</strong> (6 CSVs)</td>
+<td><a href="../data/hcp-data-casa/">data/hcp-data-casa/</a></td>
+<td>~20 KiB</td>
+<td>Province-level priors (demographics, households, literacy,
+employment)</td>
+<td>No (raw)</td>
+</tr>
+<tr>
+<td><strong>HCP arrondissement population</strong></td>
+<td><a
+href="../data/casa_arrondissement_population_2024.csv">data/casa_arrondissement_population_2024.csv</a></td>
+<td>1 KiB</td>
+<td>Per-zone 2024 population (16 rows)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Glovo opportunity score</strong></td>
+<td><a
+href="../data/opportunity-find/glovo_opportunity_score_from_commerce-2.geojson">data/opportunity-find/glovo_opportunity_score_from_commerce-2.geojson</a></td>
+<td>~700 KiB</td>
+<td>934 H3-res9 cells w/ commerce metrics</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Arrondissement polygons v4</strong></td>
+<td><a
+href="../data/casablanca_arrondissements_v4.geojson">data/casablanca_arrondissements_v4.geojson</a></td>
+<td>~300 KiB</td>
+<td>16 irregular Casa polygons (OSM-derived)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Transit POIs</strong></td>
+<td><a
+href="../data/casablanca_transit.geojson">data/casablanca_transit.geojson</a></td>
+<td>~100 KiB</td>
+<td>OSM tram/bus hubs (transit accessibility signal)</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Road graph</strong></td>
+<td><a
+href="../data/casablanca_road_graph.graphml">data/casablanca_road_graph.graphml</a></td>
+<td>~120 MiB</td>
+<td>OSMnx driving graph (street segments + intersections)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Road nodes cache</strong></td>
+<td><a
+href="../data/casablanca_road_nodes.npy">data/casablanca_road_nodes.npy</a></td>
+<td>~8 MiB</td>
+<td>Pre-computed KDTree coords for snapping</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-image.png-in-hcp-folder">1.3 The <code>image.png</code> in
+HCP folder</h3>
+<p><a
+href="../data/hcp-data-casa/image.png">data/hcp-data-casa/image.png</a>
+is a screenshot of the HCP interactive portal showing the
+per-arrondissement population for 2024. This is the <strong>primary
+source</strong> for <a
+href="../data/casa_arrondissement_population_2024.csv">data/casa_arrondissement_population_2024.csv</a>
+— transcribed manually because HCP’s API doesn’t expose arrondissement
+breakdowns.</p>
+<hr />
+<h2 id="zone-remapping-v4-casablanca-spatial-base">2. Zone Remapping v4
+— Casablanca Spatial Base</h2>
+<p><strong>Notebook</strong>: <a
+href="../notebooks/02_zone_remapping_v4.ipynb">notebooks/02_zone_remapping_v4.ipynb</a>
+<strong>Output</strong>: <a
+href="../data/zone_mapping_v4.csv">data/zone_mapping_v4.csv</a> (16
+rows) + <a
+href="../notebooks/casablanca_ae_map.html">notebooks/casablanca_ae_map.html</a></p>
+<h3 id="pipeline">2.1 Pipeline</h3>
+<pre><code>casablanca_arrondissements_v4.geojson  ─┐
+casa_arrondissement_population_2024    ─┤
+glovo_opportunity_score_from_commerce  ─┼─►  Spatial join (H3→polygon)
+casablanca_transit.geojson             ─┘
+                                        │
+                                        ▼
+                         Per-zone feature matrix (16 × 4):
+                           - commerce_weight  (Glovo sum)
+                           - pop_density       (HCP / area_km²)
+                           - poi_diversity     (Shannon entropy of POI types)
+                           - transit_hubs      (count of tram/bus stops)
+                                        │
+                                        ▼
+                       A–E urban-activity score (weighted sum)
+                       score = 0.30·commerce + 0.40·pop_density
+                             + 0.20·poi_diversity + 0.10·transit_hubs
+                                        │
+                                        ▼
+                         Quantile-based tier assignment (16 zones → 5 tiers):
+                           - A (top 15%)    → 2 zones: Sidi Belyout, Sbata
+                           - B (next 20%)   → 3 zones
+                           - C (middle 30%) → 5 zones
+                           - D (next 20%)   → 3 zones
+                           - E (bottom 15%) → 3 zones</code></pre>
+<h3 id="why-4-components-with-these-weights">2.2 Why 4 components with
+these weights?</h3>
+<table>
+<colgroup>
+<col style="width: 36%" />
+<col style="width: 26%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr>
+<th>Component</th>
+<th>Weight</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pop_density</code></td>
+<td>0.40</td>
+<td>Taxi demand scales roughly linearly with residents per km²</td>
+</tr>
+<tr>
+<td><code>commerce</code></td>
+<td>0.30</td>
+<td>Glovo signal captures business districts, shopping, leisure (demand
+drivers beyond residents)</td>
+</tr>
+<tr>
+<td><code>poi_diversity</code></td>
+<td>0.20</td>
+<td>Mixed-use zones generate cross-zone trips (vs. pure
+residential)</td>
+</tr>
+<tr>
+<td><code>transit_hubs</code></td>
+<td>0.10</td>
+<td>Taxi demand <em>inverse</em> to transit would underweight hubs
+(riders transfer at tram stations)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sanity-checks-in-the-notebook">2.3 Sanity checks (in the
+notebook)</h3>
+<ul>
+<li>Each zone has ≥1 polygon, no overlaps, covers 100% of Casa urban
+footprint</li>
+<li>A/E population ratio ≈ 3.65× (matches HCP income inequality)</li>
+<li>Adjacency graph is connected (no isolated zones)</li>
+<li><code>zone_mapping_v4.csv</code> columns:
+<code>zone_id, arrondissement_name, ae_class, population_2024, area_km2, centroid_lat, centroid_lon, adjacent_zones, commerce_score, transit_hubs</code></li>
+</ul>
+<h3 id="downstream-consumers">2.4 Downstream consumers</h3>
+<ul>
+<li>Phase 2 (trajectory warping) — uses <code>ae_class</code> for the 25
+tier-pair strata</li>
+<li>Phase 3 (NYC synthesis) — uses <code>population_2024</code> and
+<code>ae_class</code> multipliers</li>
+<li>Flink Job 3 (trip matcher) — uses <code>adjacent_zones</code> for
+fallback matching</li>
+<li>Producers — <code>centroid_lat/lon</code> for GPS anonymization</li>
+</ul>
+<hr />
+<h2 id="hcp-data-processing">3. HCP Data Processing</h2>
+<p><strong>Loader</strong>: <a
+href="../scripts/hcp_loader.py">scripts/hcp_loader.py</a>
+<strong>Consumed by</strong>: <a
+href="../notebooks/02_zone_remapping_v4.ipynb">notebooks/02_zone_remapping_v4.ipynb</a>,
+<a
+href="../notebooks/04_nyc_to_casa_synthesis.ipynb">notebooks/04_nyc_to_casa_synthesis.ipynb</a></p>
+<h3 id="the-6-raw-csvs">3.1 The 6 raw CSVs</h3>
+<p>All 6 files in <a
+href="../data/hcp-data-casa/">data/hcp-data-casa/</a> share the same
+shape but carry different indicators:</p>
+<pre><code>Titre de l&#39;indicateur | Milieu     | Sexe (optional) | Valeur(s)
+---------------------+------------+-----------------+-----------
+Population municipale | Ensemble   | Ensemble        | 2,812,504
+Population municipale | Ensemble   | Masculin        | 1,378,...
+Part 15-59 ans (%)    | Ensemble   | Ensemble        |       64.2
+...</code></pre>
+<p>Files with <code>Sexe</code> column = <strong>demographics</strong>.
+Files without = <strong>household characteristics</strong>.</p>
+<h3 id="loader-functions">3.2 Loader functions</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># scripts/hcp_loader.py</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_province_priors() <span class="op">-&gt;</span> Dict[<span class="bu">str</span>, <span class="bu">float</span>]:</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;~17 uniform priors for ALL 16 arrondissements.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Used where HCP doesn&#39;t publish zone breakdowns.&quot;&quot;&quot;</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Keys: population_province, population_female, population_male,</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       share_under_15_pct, share_15_59_pct, share_60_plus_pct,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       fertility_icf, households_total, household_size_mean,</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       share_apartment_pct, share_bidonville_pct,</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       share_owner_pct, share_renter_pct,</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       electricity_access_pct, water_access_pct,</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       salaried_share_pct, school_enrolment_6_11_pct,</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">#       trilingual_literacy_pct</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_arrondissement_population() <span class="op">-&gt;</span> pd.DataFrame:</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Per-zone 2024 population, 16 rows.</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co">    Transcribed from image.png (HCP portal screenshot).&quot;&quot;&quot;</span></span></code></pre></div>
+<h3 id="why-uniform-priors-are-ok">3.3 Why “uniform priors” are OK</h3>
+<p>HCP publishes most indicators only at <strong>Préfecture de
+Casablanca</strong> level (not arrondissement). Applying these
+province-wide means to every zone: - <strong>Doesn’t distort relative
+demand</strong> — population density already drives spatial
+heterogeneity - <strong>Keeps fare/pricing calibration honest</strong> —
+same household income assumption across zones is a conservative null
+hypothesis - <strong>Preserves audit trail</strong> — any future
+per-zone indicator can plug in without rewiring</p>
+<hr />
+<h2 id="glovo-opportunity-score">4. Glovo Opportunity Score</h2>
+<p><strong>File</strong>: <a
+href="../data/opportunity-find/glovo_opportunity_score_from_commerce-2.geojson">data/opportunity-find/glovo_opportunity_score_from_commerce-2.geojson</a>
+<strong>Consumed by</strong>: <a
+href="../notebooks/02_zone_remapping_v4.ipynb">notebooks/02_zone_remapping_v4.ipynb</a>
+(commerce component of A–E score)</p>
+<h3 id="what-it-contains">4.1 What it contains</h3>
+<p>934 H3-resolution-9 hexagons covering Casa, each with: | Field |
+Description | |——-|————-| | <code>h3_index</code> | H3 res-9 cell ID
+(edge ≈ 175 m) | | <code>opportunity_score</code> | Glovo’s internal
+demand-opportunity score (0-100) | | <code>commerce_count</code> |
+Number of registered merchants in cell | |
+<code>commerce_weight_sum</code> | Weighted sum (premium merchants count
+more) | | <code>commerce_types</code> | JSON:
+<code>{"restaurant": 12, "pharmacy": 3, ...}</code> |</p>
+<h3 id="how-it-enters-phase-1">4.2 How it enters Phase 1</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># notebooks/02_zone_remapping_v4.ipynb (excerpt)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>commerce_gdf <span class="op">=</span> gpd.read_file(<span class="st">&#39;data/opportunity-find/glovo_opportunity_score_from_commerce-2.geojson&#39;</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Spatial join: assign each H3 cell to the arrondissement polygon containing its centroid</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>commerce_per_zone <span class="op">=</span> gpd.sjoin(commerce_gdf, arr_polygons, predicate<span class="op">=</span><span class="st">&#39;within&#39;</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>zone_commerce <span class="op">=</span> commerce_per_zone.groupby(<span class="st">&#39;arrondissement_name&#39;</span>).agg(</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    commerce_weight<span class="op">=</span>(<span class="st">&#39;commerce_weight_sum&#39;</span>, <span class="st">&#39;sum&#39;</span>),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    commerce_count<span class="op">=</span>(<span class="st">&#39;commerce_count&#39;</span>, <span class="st">&#39;sum&#39;</span>),</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<p>Then <code>commerce_weight</code> is z-score normalized and plugged
+into the A–E score with weight 0.30.</p>
+<h3 id="why-glovo-specifically">4.3 Why Glovo specifically?</h3>
+<ul>
+<li>Open public dataset (no licensing cost)</li>
+<li>Already spatially indexed (H3 res-9 is the right granularity —
+smaller than an arrondissement, larger than a street block)</li>
+<li><code>opportunity_score</code> encodes implicit ground truth from
+Glovo’s 2022-2023 Casa operations</li>
+</ul>
+<hr />
+<h2 id="phase-2-porto-trajectory-warping-v4">5. Phase 2 — Porto
+Trajectory Warping (v4)</h2>
+<p><strong>Notebook</strong>: <a
+href="../notebooks/03_porto_trajectory_warping.ipynb">notebooks/03_porto_trajectory_warping.ipynb</a>
+<strong>Output</strong>: <a
+href="../data/curated_trajectories_v4.parquet">data/curated_trajectories_v4.parquet</a>
+(500 rows × ~15 columns)</p>
+<h3 id="why-we-dont-use-porto-coordinates-directly">5.1 Why we don’t use
+Porto coordinates directly</h3>
+<p>Porto bbox: <code>(41.085-41.195 N, -8.69 to -8.56 W)</code>. Casa
+bbox: <code>(33.45-33.68 N, -7.72 to -7.48 W)</code>. A pure linear
+affine transform (v3 approach) creates polylines that <strong>cross
+buildings</strong> and ignore the Casa street grid — visually obvious on
+Grafana. v4 fixes this.</p>
+<h3 id="v4-algorithm-end-to-end">5.2 v4 algorithm (end-to-end)</h3>
+<pre><code>STEP 1: Load Porto CSV
+  → filter valid POLYLINE (≥3 points, duration 2-60 min)
+  → keep only trips entirely within Porto bbox
+
+STEP 2: Sample stratified by Porto trip length
+  → 500 trips total, evenly split across duration deciles
+  → preserves variety of short/medium/long trips
+
+STEP 3: Affine-warp Porto polyline → candidate Casa polyline
+  → linear transform (stretch + shift) → rough Casa coords
+
+STEP 4: OSRM snap-to-road
+  → send candidate polyline endpoints + waypoints to local OSRM server
+  → OSRM returns actual driving path on Casablanca road graph
+  → polyline now follows real streets (no building crossings)
+
+STEP 5: Assign (origin_zone, dest_zone)
+  → spatial join polyline endpoints against arrondissements_v4
+  → compute origin_ae_class, dest_ae_class from zone_mapping_v4
+
+STEP 6: Balance the 25 tier-pair strata
+  → ensure every (A-A, A-B, ..., E-E) bucket has ≥ N trips
+  → re-sample Porto trips to fill sparse pairs if needed
+
+STEP 7: Emit curated_trajectories_v4.parquet
+  Columns: trip_id, porto_trip_id, origin_zone, dest_zone,
+           origin_ae, dest_ae, polyline_wkt (LINESTRING),
+           duration_s, distance_m, n_waypoints</code></pre>
+<h3 id="key-implementation-details-cells-in-notebook">5.3 Key
+implementation details (cells in notebook)</h3>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 24%" />
+<col style="width: 52%" />
+</colgroup>
+<thead>
+<tr>
+<th>Step</th>
+<th>Cell</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Load + clean</td>
+<td>#VSC-f7bf8cab</td>
+<td>1.7M Porto trips → ~950k valid</td>
+</tr>
+<tr>
+<td>Stratified sample</td>
+<td>#VSC-1997e0a0</td>
+<td>500 trips across length deciles</td>
+</tr>
+<tr>
+<td>Affine warp</td>
+<td>#VSC-4c685cd3</td>
+<td>Linear Porto→Casa transform with jitter</td>
+</tr>
+<tr>
+<td>OSRM cache</td>
+<td>#VSC-a7723d73</td>
+<td><code>data/.osrm_route_cache.json</code> (avoids re-querying
+OSRM)</td>
+</tr>
+<tr>
+<td>Zone assignment</td>
+<td>#VSC-9ed2fad0</td>
+<td>Spatial-join endpoints → zones</td>
+</tr>
+<tr>
+<td>Tier balance</td>
+<td>#VSC-c9387968</td>
+<td>Stratify 25 tier-pairs, fill gaps</td>
+</tr>
+<tr>
+<td>Export</td>
+<td>#VSC-6548034b</td>
+<td>Write parquet + interactive Leaflet viz</td>
+</tr>
+</tbody>
+</table>
+<h3 id="osrm-setup">5.4 OSRM setup</h3>
+<p>Runs <strong>locally</strong> on the host (not in Docker stack) at
+<code>http://localhost:5000</code>. Cache persisted at <a
+href="../data/.osrm_route_cache.json">data/.osrm_route_cache.json</a> so
+re-runs are idempotent. If OSRM isn’t available, the notebook falls back
+to graph-based shortest path using <a
+href="../data/casablanca_road_graph.graphml">data/casablanca_road_graph.graphml</a>.</p>
+<h3 id="visualization">5.5 Visualization</h3>
+<p><a
+href="../notebooks/casablanca_trajectories_v4.html">notebooks/casablanca_trajectories_v4.html</a>
+— Folium map with: - All 500 polylines colored by origin A–E class -
+Origin/destination markers clustered by zone - Zone polygons overlay
+with tier coloring - Tram/bus buffers in translucent blue</p>
+<hr />
+<h2 id="phase-3-nyc-casa-trip-synthesis">6. Phase 3 — NYC → Casa Trip
+Synthesis</h2>
+<p><strong>Notebook</strong>: <a
+href="../notebooks/04_nyc_to_casa_synthesis.ipynb">notebooks/04_nyc_to_casa_synthesis.ipynb</a>
+<strong>Outputs</strong> (all under <a
+href="../data/casa_synthesis/">data/casa_synthesis/</a>): | File | Rows
+| Purpose | |——|——|———| | <code>casa_trip_requests.parquet</code> |
+<strong>500,000</strong> | Main output: 90-day synthetic trip stream | |
+<code>casa_hourly_demand.parquet</code> | 2,160 | Aggregated demand per
+zone per hour | | <code>casa_od_matrix.parquet</code> | 256 | 16×16
+zone-pair demand matrix | | <code>nyc_to_casa_zone_bridge.csv</code> |
+1,020 | NYC TLC taxi zones → Casa zone mapping | |
+<code>eda_figures.png</code> | — | 8-panel validation figure |</p>
+<h3 id="pipeline-1">6.1 Pipeline</h3>
+<pre><code>NYC TLC Q1 2023 (3M trips, Parquet)
+         │
+         ├─► Temporal fingerprint
+         │     - hourly curve (24 weights, normalized)
+         │     - day-of-week weights (7, normalized)
+         │     - duration distribution (log-normal fit)
+         │     - same-zone ratio (~20%)
+         │
+         └─► Spatial bridge: NYC taxi zones → Casa zones
+                - 263 NYC zones grouped into 16 Casa-equivalent clusters
+                - by population + density + borough-type similarity
+                - persisted to nyc_to_casa_zone_bridge.csv
+
+HCP per-arrondissement population
+         │
+         └─► Base origin weight per zone
+
+v4 A–E class (from zone_mapping_v4.csv)
+         │
+         └─► Demand multiplier:
+                A=1.8, B=1.3, C=1.0, D=0.7, E=0.5
+
+Combined into origin probability:
+   origin_p[zone] = population[zone] × ae_mult[zone]
+                  / Σ(population × ae_mult)
+
+Destination pool per tier:
+   - Given origin zone with tier T,
+     sample destination from pool weighted by population within tier T ±1
+
+Taxi type split (Moroccan fleet model):
+   - 70% Petit taxi (intra-arrondissement, 2 km max, 1.6 MAD/km)
+   - 30% Grand taxi (inter-arrondissement, up to 30 km, 10-40 MAD/seat fixed)
+   → Determined by haversine(origin, dest)
+
+Fare calculation:
+   - Petit: base 7 MAD + 1.6 MAD/km (metered)
+   - Grand: fixed by OD pair, 10-40 MAD
+
+90-day timeline:
+   - Start: 2026-04-21 00:00:00 UTC
+   - End:   2026-07-19 23:59:59 UTC
+   - Event_time sampled from hourly × dow distribution
+   - ~5,555 trips/day, ~230 trips/hour peak</code></pre>
+<h3 id="output-schema-casa_trip_requests.parquet">6.2 Output schema:
+<code>casa_trip_requests.parquet</code></h3>
+<pre><code>trip_id          string  UUID4
+rider_id         string  rider_00001..rider_99999 (10k unique)
+origin_zone      int     1-16
+origin_zone_name string  e.g. &quot;Sidi Belyout&quot;
+origin_lat       float   centroid lat ± jitter
+origin_lon       float   centroid lon ± jitter
+origin_h3        string  H3 res-9 of origin
+destination_zone int     1-16
+dest_lat         float
+dest_lon         float
+dest_h3          string
+event_time       timestamp  UTC (90-day span)
+call_type        string  A=dispatch, B=stand, C=street hail
+fleet_type       string  petit | grand
+fare_mad         float
+distance_km      float   haversine
+duration_s       int     sampled from NYC log-normal
+origin_class     string  A-E
+dest_class       string  A-E</code></pre>
+<h3 id="panel-validation-all-passed">6.3 8-panel validation (all
+passed)</h3>
+<p><a
+href="../data/casa_synthesis/eda_figures.png">data/casa_synthesis/eda_figures.png</a>:
+1. Hourly demand curve — twin peaks at 08:00 and 18:00 ✓ 2. Day-of-week
+— Fri highest, Sun lowest ✓ 3. Fleet split — 70.6% Petit / 29.4% Grand ✓
+4. Origin distribution — A-tier zones dominate ✓ 5. A/E per-capita
+demand ratio — 3.65× ✓ 6. Fare distributions — Petit median 12.6 MAD,
+Grand median 25.0 MAD ✓ 7. Trip duration CDF — matches NYC log-normal ✓
+8. Same-zone ratio — 19.9% ✓</p>
+<hr />
+<h2 id="phase-4-runtime-coupling">7. Phase 4 — Runtime Coupling</h2>
+<p><strong>Builder</strong>: <a
+href="../scripts/build_trajectory_index.py">scripts/build_trajectory_index.py</a>
+<strong>Output</strong>: <a
+href="../data/casa_synthesis/gps_trajectory_index.json">data/casa_synthesis/gps_trajectory_index.json</a>
+(2.35 MB)</p>
+<h3 id="why-we-need-an-index">7.1 Why we need an index</h3>
+<p>Phase 3 produces 500k trips with (origin_zone, dest_zone,
+event_time). Phase 2 produces 500 polylines with (origin_zone,
+dest_zone). At runtime, each incoming trip needs a polyline — we can’t
+do a live spatial join 500k times. The index is a pre-computed
+lookup.</p>
+<h3 id="index-structure">7.2 Index structure</h3>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;by_zone_pair&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;(3, 10)&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="dv">12</span><span class="ot">,</span> <span class="dv">47</span><span class="ot">,</span> <span class="dv">89</span><span class="ot">,</span> <span class="dv">234</span><span class="ot">]</span><span class="fu">,</span>   <span class="er">//</span> <span class="er">trip_idx</span> <span class="er">list</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;(5, 2)&quot;</span><span class="fu">:</span>  <span class="ot">[</span><span class="dv">7</span><span class="ot">,</span> <span class="dv">33</span><span class="ot">,</span> <span class="dv">128</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="er">...</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;by_tier_pair&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;(A, A)&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="dv">1</span><span class="ot">,</span> <span class="dv">55</span><span class="ot">,</span> <span class="dv">200</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;(A, B)&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="dv">3</span><span class="ot">,</span> <span class="dv">78</span><span class="ot">,</span> <span class="er">...</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="er">...</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">},</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;polylines&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span><span class="dt">&quot;trip_id&quot;</span><span class="fu">:</span> <span class="er">...</span><span class="fu">,</span> <span class="dt">&quot;origin_zone&quot;</span><span class="fu">:</span> <span class="dv">3</span><span class="fu">,</span> <span class="dt">&quot;dest_zone&quot;</span><span class="fu">:</span> <span class="dv">10</span><span class="fu">,</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>     <span class="dt">&quot;origin_ae&quot;</span><span class="fu">:</span> <span class="st">&quot;C&quot;</span><span class="fu">,</span> <span class="dt">&quot;dest_ae&quot;</span><span class="fu">:</span> <span class="st">&quot;B&quot;</span><span class="fu">,</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>     <span class="dt">&quot;coords&quot;</span><span class="fu">:</span> <span class="ot">[[</span><span class="er">lat</span><span class="ot">,</span> <span class="er">lon</span><span class="ot">],</span> <span class="er">...</span><span class="ot">]</span><span class="fu">,</span> <span class="dt">&quot;duration_s&quot;</span><span class="fu">:</span> <span class="dv">842</span><span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="er">...</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<ul>
+<li><strong>160 zone-pairs</strong> covered (some zone pairs have no
+Porto analog)</li>
+<li><strong>25 tier-pairs</strong> covered (full A-E × A-E matrix)</li>
+<li>Producer uses zone-pair match first, falls back to tier-pair, then
+random</li>
+</ul>
+<h3 id="gps-producer-consumption-runtime">7.3 GPS producer consumption
+(runtime)</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># producers/vehicle_gps_producer.py (coupled mode)</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> trip <span class="kw">in</span> phase4_trips:</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    polyline <span class="op">=</span> pick_trajectory(</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        trip[<span class="st">&quot;origin_zone&quot;</span>], trip[<span class="st">&quot;destination_zone&quot;</span>],</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        trip[<span class="st">&quot;origin_class&quot;</span>], trip[<span class="st">&quot;dest_class&quot;</span>]</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    )  <span class="co"># index lookup</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># schedule GPS pings every 4s along polyline</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># add ±20m Gaussian jitter + 5% blackout</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    emit_to_kafka(<span class="st">&quot;raw.gps&quot;</span>, ping)</span></code></pre></div>
+<hr />
+<h2 id="directory-structure-what-lives-where">8. Directory Structure
+(What Lives Where)</h2>
+<pre><code>Taasimm/
+├── data/
+│   ├── hcp-data-casa/              # HCP census raw CSVs + portal screenshot
+│   │   ├── 20260421_*.csv          # 6 indicator files (MOR RGPH 2024)
+│   │   └── image.png               # portal screenshot (per-arr pop source)
+│   ├── opportunity-find/           # Glovo commerce data
+│   │   └── glovo_opportunity_score_from_commerce-2.geojson
+│   ├── casa_synthesis/             # Phase 3 + Phase 4 outputs
+│   │   ├── casa_trip_requests.parquet      # 500k synthetic trips
+│   │   ├── casa_hourly_demand.parquet
+│   │   ├── casa_od_matrix.parquet
+│   │   ├── nyc_to_casa_zone_bridge.csv
+│   │   ├── gps_trajectory_index.json       # Phase 4 index
+│   │   └── eda_figures.png
+│   ├── nyc-tlc/                    # NYC TLC raw Parquet (MinIO)
+│   ├── train.csv                   # Porto raw CSV (MinIO)
+│   ├── casablanca_arrondissements_v4.geojson
+│   ├── casablanca_transit.geojson
+│   ├── casablanca_road_graph.graphml        # OSMnx graph (MinIO)
+│   ├── casablanca_road_nodes.npy
+│   ├── casa_arrondissement_population_2024.csv
+│   ├── curated_trajectories_v4.parquet      # Phase 2 output
+│   ├── zone_mapping_v4.csv                  # Phase 1 output
+│   └── .osrm_route_cache.json              # OSRM cache (gitignored)
+│
+├── notebooks/
+│   ├── 01_porto_eda.ipynb                   # Week 1 EDA
+│   ├── 02_zone_remapping.ipynb              # v3 (legacy)
+│   ├── 02_zone_remapping_v4.ipynb           # v4 (current — A-E scoring)
+│   ├── 03_h3_zone_remapping.ipynb           # H3 exploration
+│   ├── 03_porto_trajectory_warping.ipynb    # Phase 2: warp + OSRM
+│   ├── 03_zone_mapping.ipynb                # earlier exploration
+│   ├── 04_nyc_etl_and_ml.ipynb              # NYC ETL preliminary
+│   ├── 04_nyc_to_casa_synthesis.ipynb       # Phase 3: synthesize 500k trips
+│   ├── casablanca_ae_map.html               # Phase 1 viz
+│   └── casablanca_trajectories_v4.html      # Phase 2 viz
+│
+├── scripts/
+│   ├── hcp_loader.py                        # HCP CSV loader (priors + pop)
+│   ├── build_arrondissement_polygons_v4.py  # OSM → v4 geojson
+│   ├── refetch_arrondissement_polygons.py   # OSM fetch retries
+│   ├── _validate_v4_polygons.py             # polygon QA
+│   ├── fetch_casablanca_transit.py          # OSM Overpass → transit geojson
+│   ├── build_trajectory_index.py            # Phase 4: build index JSON
+│   ├── generate_road_assets.py              # road graph + nodes .npy
+│   ├── offline_projector.py                 # affine Porto→Casa helper
+│   ├── remap_quality_gate.py                # zone-remap QA checks
+│   └── verify_week3.py                      # Flink job verification
+│
+├── producers/
+│   ├── config.py                            # paths + bbox + zone loader
+│   ├── trip_request_producer.py             # --source casa_synth
+│   ├── vehicle_gps_producer.py              # --mode coupled
+│   └── Dockerfile                           # python:3.13-slim + deps
+│
+├── flink/jobs/
+│   ├── gps_normalizer.py                    # Job 1: zone assign + centroid snap
+│   ├── demand_aggregator.py                 # Job 2: 30s window + supply/demand
+│   └── trip_matcher.py                      # Job 3: nearest vehicle + fallback
+│
+└── documents/
+    ├── 00_master_status.md
+    ├── 06_next_steps.md                     # sprint log
+    ├── 07_adr_v1.md                         # Architecture Decision Record
+    └── 11_data_pipeline_architecture.md     # ← this file</code></pre>
+<hr />
+<h2 id="end-to-end-data-flow-diagram">9. End-to-End Data Flow
+Diagram</h2>
+<pre><code>┌──────────────────────────────────────────────────────────────────────────────┐
+│  LAYER 1 — RAW INPUTS                                                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Porto taxi CSV        NYC TLC Parquet      HCP CSVs + screenshot           │
+│  (1.7M trips)          (3M trips Q1 2023)   (6 ind. + pop.png)              │
+│       │                      │                    │                          │
+│       │                      │                    │                          │
+│  OSM arrondissement    Glovo H3 geojson     OSM transit geojson             │
+│  polygons v4           (934 cells)          (tram/bus)                       │
+│       │                      │                    │                          │
+└───────┼──────────────────────┼────────────────────┼──────────────────────────┘
+        │                      │                    │
+        │                      ▼                    ▼
+        │     ┌──────────────────────────────────────────────────────┐
+        │     │  PHASE 1 — Zone remapping v4                          │
+        │     │  [02_zone_remapping_v4.ipynb]                         │
+        │     │  A-E score = 0.30·commerce + 0.40·pop_density         │
+        │     │            + 0.20·poi_div + 0.10·transit              │
+        │     │                                                        │
+        │     │  → zone_mapping_v4.csv (16 rows, A-E tiers)           │
+        │     └──────────────┬────────────────────────────────────────┘
+        │                    │
+        ▼                    ▼
+┌───────────────────────────────────────┐  ┌──────────────────────────────────┐
+│  PHASE 2 — Porto trajectory warping   │  │  PHASE 3 — NYC→Casa synthesis    │
+│  [03_porto_trajectory_warping.ipynb]  │  │  [04_nyc_to_casa_synthesis.ipynb]│
+│                                        │  │                                  │
+│  Porto polyline                        │  │  NYC temporal fingerprint        │
+│   → affine warp → OSRM snap            │  │  × HCP per-zone pop              │
+│   → 500 polylines stratified           │  │  × A-E demand multipliers        │
+│     over 25 tier-pairs                 │  │  × Petit/Grand fleet split       │
+│                                        │  │                                  │
+│  → curated_trajectories_v4.parquet     │  │  → casa_trip_requests.parquet    │
+│    (500 rows)                          │  │    (500k rows, 90 days)          │
+└───────────────────────────┬────────────┘  └───────────────┬──────────────────┘
+                            │                               │
+                            └───────────────┬───────────────┘
+                                            ▼
+                 ┌──────────────────────────────────────────┐
+                 │  PHASE 4 — Build trajectory index        │
+                 │  [scripts/build_trajectory_index.py]     │
+                 │                                          │
+                 │  Index polylines by:                     │
+                 │    - (origin_zone, dest_zone) → 160 pairs│
+                 │    - (origin_tier, dest_tier) → 25 pairs │
+                 │                                          │
+                 │  → gps_trajectory_index.json (2.35 MB)   │
+                 └──────────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                 ┌──────────────────────────────────────────┐
+                 │  LAYER 4 — PRODUCERS (runtime)           │
+                 │                                          │
+                 │  trip_request_producer --source casa_synth│
+                 │    replays casa_trip_requests.parquet    │
+                 │    → Kafka raw.trips                     │
+                 │                                          │
+                 │  vehicle_gps_producer --mode coupled     │
+                 │    pairs each trip w/ indexed polyline   │
+                 │    → Kafka raw.gps                       │
+                 └──────────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                 ┌──────────────────────────────────────────┐
+                 │  LAYER 5 — FLINK STREAMING               │
+                 │  Job 1: GPS normalizer (centroid snap)   │
+                 │  Job 2: Demand aggregator (30s windows)  │
+                 │  Job 3: Trip matcher (nearest + adjacent)│
+                 └──────────────────┬───────────────────────┘
+                                    │
+                                    ▼
+                 ┌──────────────────────────────────────────┐
+                 │  LAYER 6 — CASSANDRA + GRAFANA           │
+                 │  - vehicle_positions (24h TTL)           │
+                 │  - trips (date_bucket partitioned)       │
+                 │  - demand_zones (7d TTL)                 │
+                 │                                          │
+                 │  Grafana: TaaSim — Live Pipeline         │
+                 └──────────────────────────────────────────┘</code></pre>
+<hr />
+<h2 id="quality-gates-reproducibility">10. Quality Gates &amp;
+Reproducibility</h2>
+<table>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 31%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Tool</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zone polygon validity</td>
+<td><code>_validate_v4_polygons.py</code></td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>A–E tier balance (3-5 per tier)</td>
+<td>notebook assertions</td>
+<td>Phase 1</td>
+</tr>
+<tr>
+<td>Porto trip coverage (25 tier-pairs)</td>
+<td>notebook assertions</td>
+<td>Phase 2</td>
+</tr>
+<tr>
+<td>OSRM cache hit rate</td>
+<td><code>.osrm_route_cache.json</code> diagnostics</td>
+<td>Phase 2</td>
+</tr>
+<tr>
+<td>NYC fingerprint extraction</td>
+<td><code>remap_quality_gate.py</code></td>
+<td>Phase 3</td>
+</tr>
+<tr>
+<td>8 synthesis validation checks</td>
+<td>EDA figure (visual + assertion)</td>
+<td>Phase 3</td>
+</tr>
+<tr>
+<td>Trajectory index coverage</td>
+<td><code>build_trajectory_index.py</code> logs</td>
+<td>Phase 4</td>
+</tr>
+<tr>
+<td>End-to-end Cassandra zone coverage</td>
+<td><code>scripts/verify_week3.py</code></td>
+<td>Runtime</td>
+</tr>
+</tbody>
+</table>
+<h3 id="re-running-from-scratch">Re-running from scratch</h3>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Upload raw datasets to MinIO (one-time)</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="op">.</span>\upload-datasets<span class="op">.</span><span class="fu">ps1</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Regenerate zone map (if polygons change)</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>jupyter execute notebooks<span class="op">/</span>02_zone_remapping_v4<span class="op">.</span><span class="fu">ipynb</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Regenerate Porto trajectories (needs OSRM local)</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>jupyter execute notebooks<span class="op">/</span>03_porto_trajectory_warping<span class="op">.</span><span class="fu">ipynb</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Regenerate NYC→Casa synthesis</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>jupyter execute notebooks<span class="op">/</span>04_nyc_to_casa_synthesis<span class="op">.</span><span class="fu">ipynb</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. Rebuild runtime index</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="op">.</span><span class="fu">venv</span>\Scripts\python<span class="op">.</span><span class="fu">exe</span> scripts\build_trajectory_index<span class="op">.</span><span class="fu">py</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 6. Restart producers with new data</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>docker compose up <span class="op">-</span>d <span class="op">--</span>build <span class="op">--</span>force-recreate gps-producer trip-producer</span></code></pre></div>
+<hr />
+<h2 id="open-questions-future-work">11. Open Questions / Future
+Work</h2>
+<ul>
+<li><strong>Per-arrondissement HCP indicators</strong>: request directly
+from HCP to replace province-wide priors</li>
+<li><strong>Real-time weather</strong> (is_raining feature) — currently
+stubbed in ML pipeline</li>
+<li><strong>Multi-city scaling</strong>: the same Porto + NYC + HCP +
+Glovo recipe should work for Rabat, Marrakech with minimal changes (just
+swap the per-zone CSVs)</li>
+<li><strong>Trajectory index refresh</strong>: currently 500 polylines,
+could expand to 2000 for tighter tier coverage</li>
+<li><strong>Gamification of coupled mode</strong>: add idle-cruising
+taxis to raise Job 3 match rate beyond 21%</li>
+</ul>
+</body>
+</html>

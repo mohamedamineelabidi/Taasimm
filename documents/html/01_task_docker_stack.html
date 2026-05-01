@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>01_task_docker_stack</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#task-1---docker-compose-stack"
+id="toc-task-1---docker-compose-stack">Task 1 - Docker Compose Stack</a>
+<ul>
+<li><a href="#objective" id="toc-objective">Objective</a></li>
+<li><a href="#delivered" id="toc-delivered">Delivered</a></li>
+<li><a href="#validation-done-earlier"
+id="toc-validation-done-earlier">Validation Done Earlier</a></li>
+<li><a href="#current-note" id="toc-current-note">Current Note</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="task-1---docker-compose-stack">Task 1 - Docker Compose
+Stack</h1>
+<p>Status: Completed (with runtime dependency note) Last updated:
+2026-04-03</p>
+<h2 id="objective">Objective</h2>
+<p>Provision local stack with Kafka, MinIO, Cassandra, Flink, Spark, and
+Grafana.</p>
+<h2 id="delivered">Delivered</h2>
+<ul>
+<li>docker-compose.yml prepared with required services</li>
+<li>Kafka configured in KRaft mode</li>
+<li>Host Kafka listener prepared for local producers (localhost:9092 via
+PLAINTEXT_HOST mapping)</li>
+<li>MinIO, Cassandra, Flink, Spark, Grafana configured</li>
+</ul>
+<h2 id="validation-done-earlier">Validation Done Earlier</h2>
+<ul>
+<li>Core service stack was previously validated during setup phase</li>
+<li>Topic creation and producer tests were successful in prior run when
+Docker engine was available</li>
+</ul>
+<h2 id="current-note">Current Note</h2>
+<ul>
+<li>In this session, docker compose commands cannot connect because
+Docker daemon is currently unavailable.</li>
+<li>This is an infrastructure runtime condition, not a compose
+definition issue.</li>
+</ul>
+</body>
+</html>

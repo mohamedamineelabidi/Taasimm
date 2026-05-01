@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>14_end_to_end_deep_analysis</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<h1 id="taasim-end-to-end-deep-architectural-analysis">TaaSim —
+End-to-End Deep Architectural Analysis</h1>
+<blockquote>
+<p><strong>Scope</strong>: Every moving part — from Porto CSV on disk to
+Grafana pixel — explained mechanically, with code excerpts, schemas,
+flow diagrams, and critical evaluation.</p>
+<p><strong>Last updated</strong>: 2026-04-22 <strong>Related
+docs</strong>: <a
+href="11_data_pipeline_architecture.md">11_data_pipeline_architecture.md</a>,
+<a
+href="13_remapping_and_synthesis_deep_dive.md">13_remapping_and_synthesis_deep_dive.md</a>,
+<a href="07_adr_v1.md">07_adr_v1.md</a>, <a
+href="00_master_status.md">00_master_status.md</a>.</p>
+</blockquote>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol type="1">
+<li><a href="#1--global-architecture--data-flow">Global Architecture
+&amp; Data Flow</a></li>
+<li><a
+href="#2--trajectory-remapping-logic--porto--casablanca">Trajectory
+Remapping Logic — Porto → Casablanca</a></li>
+<li><a href="#3--regions--spatial-modeling">Regions &amp; Spatial
+Modeling</a></li>
+<li><a href="#4--matching-logic-flink-job-3">Matching Logic (Flink Job
+3)</a></li>
+<li><a href="#5--flink-processing--job-by-job">Flink Processing —
+Job-by-Job</a></li>
+<li><a href="#6--dataset-generation">Dataset Generation</a></li>
+<li><a href="#7--file-by-file-breakdown">File-by-File Breakdown</a></li>
+<li><a href="#8--storage-layer">Storage Layer</a></li>
+<li><a href="#9--monitoring-grafana">Monitoring (Grafana)</a></li>
+<li><a href="#10--critical-evaluation">Critical Evaluation</a></li>
+</ol>
+<hr />
+<h2 id="global-architecture-data-flow">1. 🔁 Global Architecture &amp;
+Data Flow</h2>
+<h3 id="architectural-style-kappa">1.1 Architectural style:
+<strong>Kappa</strong></h3>
+<p>Kafka is the <strong>only</strong> system of record for live data.
+Flink is the <strong>only</strong> real-time processor. Spark is
+<strong>offline only</strong> (ETL + ML training). This contract is
+enforced: NYC data never enters Kafka; only synthesised Casa events
+do.</p>
+<h3 id="the-12-container-stack">1.2 The 12-container stack</h3>
+<pre><code>┌───────────────────────────────────────────────────────────────────────────┐
+│ OFFLINE (one-time / batch)                                                │
+│  Notebooks ──► data/casa_synthesis/*.parquet  (500k synthetic Casa trips) │
+│  Notebooks ──► data/curated_trajectories_v4.parquet (500 OSRM polylines)  │
+│  build_trajectory_index.py ──► gps_trajectory_index.json                  │
+└─────────────────────────────┬─────────────────────────────────────────────┘
+                              │ (mounted into producer containers)
+                              ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│ LIVE STREAMING PATH                                                       │
+│                                                                           │
+│  trip-producer   ──► raw.trips    ┐                                       │
+│                                   ├──► Flink Job 1 (GPS Normalizer)       │
+│  gps-producer    ──► raw.gps      │     • dedup, zone assign, centroid    │
+│                                   │       snap, watermark 3min            │
+│                                   │     ├─► Cassandra: vehicle_positions  │
+│                                   │     └─► Kafka: processed.gps          │
+│                                   │                                       │
+│                                   ├──► Flink Job 2 (Demand Aggregator)    │
+│                                   │     • 30s tumbling window per zone    │
+│                                   │     • union(processed.gps, raw.trips) │
+│                                   │     ├─► Cassandra: demand_zones       │
+│                                   │     └─► Kafka: processed.demand       │
+│                                   │                                       │
+│                                   └──► Flink Job 3 (Trip Matcher)         │
+│                                         • keyed state: vehicles per zone  │
+│                                         • adjacency fallback              │
+│                                         ├─► Cassandra: trips              │
+│                                         └─► Kafka: processed.matches      │
+│                                                                           │
+│  Kafka Connect S3 Sink  ──► MinIO s3://kafka-archive/{raw.gps,raw.trips}/ │
+│  Flink checkpoints      ──► MinIO s3://curated/flink-checkpoints/         │
+│                                                                           │
+│  Cassandra ◄── Grafana (Cassandra datasource plugin)                      │
+│  Cassandra ◄── FastAPI  (JWT, GBT model loaded from mldata/models/)       │
+└───────────────────────────────────────────────────────────────────────────┘</code></pre>
+<h3 id="step-by-step-data-flow-one-gps-ping">1.3 Step-by-step data flow
+(one GPS ping)</h3>
+<ol type="1">
+<li><strong>Producer</strong> picks an active trip from
+<code>casa_trip_requests.parquet</code>, looks up its polyline in
+<code>gps_trajectory_index.json</code>, interpolates a position at the
+current wall-clock tick, adds ±20m Gaussian jitter (5% chance of 60–180s
+blackout delay), computes H3-res-9 cell → publishes JSON to
+<code>raw.gps</code>.</li>
+<li><strong>Kafka</strong> partitions by <code>taxi_id</code> across 4
+partitions (7-day retention).</li>
+<li><strong>Kafka Connect</strong> mirrors the raw event to
+<code>s3://kafka-archive/raw.gps/YYYY/MM/DD/HH/*.parquet</code> (replay
+capability).</li>
+<li><strong>Flink Job 1</strong> consumes, extracts
+<code>event_time</code> for watermark (3-min bounded lateness), keys by
+<code>taxi_id</code>, deduplicates via
+<code>ValueState&lt;last_ts&gt;</code>, validates bounds + speed, looks
+up <code>h3_index → zone_id</code> in an in-memory broadcast map, snaps
+lat/lon to <code>(zone_centroid + hash-based jitter)</code>, writes
+async to Cassandra <code>vehicle_positions</code>, and forwards to
+<code>processed.gps</code>.</li>
+<li><strong>Flink Job 2</strong> unions <code>processed.gps</code> +
+<code>raw.trips</code> on a <code>(city, zone_id)</code> key, opens a
+30-second event-time tumbling window, counts <strong>distinct</strong>
+<code>taxi_id</code> and trip events, computes
+<code>ratio = requests / max(1, vehicles)</code>, writes
+<code>demand_zones</code> (TTL 7d) and forwards to
+<code>processed.demand</code>.</li>
+<li><strong>Flink Job 3</strong> maintains
+<code>MapState&lt;zone_id, Map&lt;taxi_id, position&gt;&gt;</code> (TTL
+60s). On each trip request it scores vehicles in the origin zone by
+<code>0.7·distance_km + 0.3·idle_penalty</code>, falls back to
+<code>adjacent_zones</code> after 5s, removes matched vehicle from state
+(prevents double-booking), computes <code>eta_seconds</code> and fare,
+writes <code>trips</code> and forwards to
+<code>processed.matches</code>.</li>
+<li><strong>Grafana</strong> queries Cassandra every ~5s (Geomap panel
+on <code>vehicle_positions</code>, bar/heatmap on
+<code>demand_zones</code>) → user sees live taxi dots and zone
+heatmap.</li>
+<li><strong>FastAPI</strong> serves <code>/api/demand/forecast</code> —
+GBT model loaded once from <code>s3a://mldata/models/demand_v1/</code>
+at startup; queries Cassandra for live features, returns prediction in
+&lt;500ms.</li>
+</ol>
+<hr />
+<h2 id="trajectory-remapping-logic-porto-casablanca">2. 🌍 Trajectory
+Remapping Logic — Porto → Casablanca</h2>
+<p>Remapping happens in <strong>four phases</strong>, all offline, all
+reproducible.</p>
+<h3 id="phase-1-casa-zone-skeleton-02_zone_remapping_v4.ipynb">2.1 Phase
+1 — Casa zone skeleton (<code>02_zone_remapping_v4.ipynb</code>)</h3>
+<p>Produces <a
+href="../data/zone_mapping_v4.csv">../data/zone_mapping_v4.csv</a> with
+<strong>16 irregular arrondissement polygons</strong> (9 OSM official +
+7 Voronoi-clipped) scored on four features and quantile-cut into A–E
+tiers:</p>
+<p><span
+class="math display">score<sub><em>z</em></sub> = 0.40 ⋅ <em>ρ</em><sub><em>z</em></sub> + 0.30 ⋅ <em>c</em><sub><em>z</em></sub> + 0.20 ⋅ <em>d</em><sub><em>z</em></sub> + 0.10 ⋅ <em>t</em><sub><em>z</em></sub></span></p>
+<ul>
+<li><span class="math inline"><em>ρ</em><sub><em>z</em></sub></span>:
+population density (HCP 2024 / area_km²)</li>
+<li><span class="math inline"><em>c</em><sub><em>z</em></sub></span>:
+Glovo commerce weight (934 H3 res-9 cells spatially joined)</li>
+<li><span class="math inline"><em>d</em><sub><em>z</em></sub></span>:
+POI diversity (Shannon-ish count of distinct commerce types)</li>
+<li><span class="math inline"><em>t</em><sub><em>z</em></sub></span>:
+tram/BRT stop count (OSM)</li>
+</ul>
+<p>Tiers: <strong>A</strong> (top 2 zones: Sidi Belyout, Sbata) →
+<strong>E</strong> (Moulay Rachid). The A/E per-capita demand ratio ≈
+<strong>3.65×</strong> matches HCP income inequality data — a real
+ground-truth sanity check.</p>
+<h3
+id="phase-2-trajectory-warping-03_porto_trajectory_warping.ipynb">2.2
+Phase 2 — Trajectory warping
+(<code>03_porto_trajectory_warping.ipynb</code>)</h3>
+<p><strong>Input</strong>: Porto <code>train.csv</code> (1.7M trips with
+dense POLYLINE arrays). <strong>Output</strong>:
+<code>data/curated_trajectories_v4.parquet</code> — 500 stratified Casa
+polylines.</p>
+<p><strong>7-stage algorithm</strong>:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 40%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Transform</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Load &amp; filter</td>
+<td><code>duration ∈ [3, 30]min</code>,
+<code>length ∈ [1.5, 18]km</code>, <code>speed ∈ [8, 65]km/h</code></td>
+<td>Discard unrealistic Porto trips</td>
+</tr>
+<tr>
+<td>2. Stratified sample</td>
+<td>500 trips across duration deciles</td>
+<td>Preserve short/medium/long variety</td>
+</tr>
+<tr>
+<td>3. AE-class sampling</td>
+<td>Draw origin class from
+<code>{A:.35, B:.30, C:.20, D:.10, E:.05}</code>; dest from 5×5
+transition matrix</td>
+<td>Encodes CBD-pull + distance-decay laws</td>
+</tr>
+<tr>
+<td>4. Affine warp</td>
+<td><code>casa_lat = lerp(porto_lat, [41.135,41.174], [33.45,33.68])</code>
+(endpoints only)</td>
+<td>Linear bbox transform (cahier §2.1)</td>
+</tr>
+<tr>
+<td>5. Anchor</td>
+<td>Pull endpoints toward zone centroid with α=0.80 + Gaussian jitter
+σ≈160m</td>
+<td>Align to actual A–E zones</td>
+</tr>
+<tr>
+<td>6. OSRM snap</td>
+<td><code>GET /route/v1/driving/{o};{d}</code> → road-following
+polyline</td>
+<td><strong>Fixes buildings-crossing bug of v3</strong></td>
+</tr>
+<tr>
+<td>7. Persist</td>
+<td>Parquet + cached at <code>data/.osrm_route_cache.json</code></td>
+<td>Idempotent re-runs</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Why OSRM beats in-process A*</strong>: v3 used OSMnx +
+weighted A* → visible zigzags on short trips. OSRM uses full OSM driving
+profile → zero zigzags, handles one-ways, &lt;1% failure rate.</p>
+<h3 id="filtering-unrealistic-trajectories">2.3 Filtering unrealistic
+trajectories</h3>
+<p>Three defensive gates: - <strong>Source-side</strong>: Porto
+<code>MISSING_DATA=False</code>, duration/speed bounds, origin inside
+Porto metro bbox. - <strong>OSRM-side</strong>: Route must succeed;
+snap-distance cap 333m. - <strong>Land validation</strong>: Every
+endpoint must fall inside a Casa arrondissement polygon (spatial
+join).</p>
+<h3 id="behavioral-validation">2.4 Behavioral validation</h3>
+<p>The AE transition matrix encodes two empirical urban-mobility laws: -
+<strong>A-attraction asymmetry</strong>: A generates 35% of rides but
+receives more (CBD pull). - <strong>Distance decay</strong>: Each class
+skews dest toward same or adjacent tier.</p>
+<p>Low-activity zones (E-tier: Moulay Rachid) have correspondingly low
+taxi density in the simulation — not artificially boosted. This is
+visible in the per-zone origin bar chart in <code>eda_figures.png</code>
+(red = A, purple = E).</p>
+<h3 id="is-the-remapping-realistic">2.5 Is the remapping realistic?</h3>
+<p><strong>Verdict — partially realistic, honestly
+calibrated</strong>:</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 33%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Realism</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Motion geometry (street-following polylines)</td>
+<td>✅ High</td>
+<td>OSRM produces real Casa driving paths</td>
+</tr>
+<tr>
+<td>Temporal demand (hourly/DoW curve)</td>
+<td>✅ High</td>
+<td>NYC fingerprint validated in 8-panel figure; twin peaks
+08:00/18:00</td>
+</tr>
+<tr>
+<td>Per-zone demand weights</td>
+<td>🟡 Medium</td>
+<td>HCP pop + Glovo commerce are real priors, but HCP indicators beyond
+pop are province-level (uniformly applied)</td>
+</tr>
+<tr>
+<td>Zone boundaries</td>
+<td>🟡 Medium</td>
+<td>9/16 are real OSM admins, 7/16 are Voronoi approximations
+(explicitly disclosed)</td>
+</tr>
+<tr>
+<td>OD structure</td>
+<td>🟡 Medium</td>
+<td>AE transition matrix is plausible but not measured from Casa
+data</td>
+</tr>
+<tr>
+<td>Fleet model</td>
+<td>✅ High</td>
+<td>Moroccan petit/grand split (70/30), real tariff model (7+1.6 MAD/km
+petit; 10–40 MAD grand)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="regions-spatial-modeling">3. 🗺️ Regions &amp; Spatial
+Modeling</h2>
+<h3 id="zone-definition-stack">3.1 Zone definition stack</h3>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 43%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Granularity</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>16 arrondissement polygons</strong></td>
+<td>Zone-level</td>
+<td>Demand aggregation, Cassandra partition key, Grafana heatmap</td>
+</tr>
+<tr>
+<td><strong>H3 res-9 cells</strong> (~174m hex)</td>
+<td>Sub-zone</td>
+<td>Fast GPS→zone lookup in producer (O(1) via
+<code>h3_zone_lookup.json</code>)</td>
+</tr>
+<tr>
+<td><strong>Zone centroid + bounds</strong></td>
+<td>Point</td>
+<td>Cassandra anonymization, Flink jitter clamp</td>
+</tr>
+<tr>
+<td><strong>Adjacency graph</strong></td>
+<td>Zone-pair</td>
+<td>Flink Job 3 fallback matching</td>
+</tr>
+</tbody>
+</table>
+<h3 id="how-a-raw-gps-point-becomes-a-zone">3.2 How a raw GPS point
+becomes a zone</h3>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Producer-side (O(1))</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>h3_cell <span class="op">=</span> h3.latlng_to_cell(lat, lon, <span class="dv">9</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>zone_id <span class="op">=</span> h3_zone_lookup.get(h3_cell)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> zone_id <span class="kw">is</span> <span class="va">None</span>:                 <span class="co"># fallback: ring search up to radius 5</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> r <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">1</span>, <span class="dv">6</span>):</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> nb <span class="kw">in</span> h3.grid_ring(h3_cell, r):</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> nb <span class="kw">in</span> h3_zone_lookup: ...</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Flink-side (trust producer, verify bounds)</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="kw">not</span> (<span class="fl">33.45</span> <span class="op">&lt;=</span> lat <span class="op">&lt;=</span> <span class="fl">33.68</span> <span class="kw">and</span> <span class="op">-</span><span class="fl">7.72</span> <span class="op">&lt;=</span> lon <span class="op">&lt;=</span> <span class="op">-</span><span class="fl">7.48</span>): drop</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>zone <span class="op">=</span> h3_zone_lookup[h3_cell]      <span class="co"># broadcast map</span></span></code></pre></div>
+<h3 id="role-of-porto-and-casablanca">3.3 Role of Porto and
+Casablanca</h3>
+<ul>
+<li><strong>Porto</strong> is a <em>motion donor</em>. Its GPS polylines
+shape the Casa trajectories but its coordinates never appear in Kafka.
+Only the <strong>geometry topology</strong> is borrowed; endpoints are
+re-anchored to Casa zones before OSRM snapping.</li>
+<li><strong>Casablanca</strong> is the <em>target universe</em>. All
+streaming, all Cassandra state, all dashboards operate exclusively in
+Casa lat/lon + zone_id space.</li>
+</ul>
+<hr />
+<h2 id="matching-logic-flink-job-3">4. 🔗 Matching Logic (Flink Job
+3)</h2>
+<h3 id="data-structures">4.1 Data structures</h3>
+<ul>
+<li><code>MapState&lt;zone_id, Map&lt;taxi_id, {lat, lon, speed_kmh}&gt;&gt;</code>
+— TTL 60s, auto-expires offline taxis.</li>
+<li>In-memory <code>Set&lt;trip_id&gt;</code> of already-matched trips
+(reset at 50k) — prevents Kafka-retry double-matches.</li>
+</ul>
+<h3 id="scoring-function">4.2 Scoring function</h3>
+<pre><code>cost = 0.7 * haversine_km(trip_origin, vehicle_pos)
+     + 0.3 * (1.0 if vehicle.speed_kmh &lt; 5 else 0.0)   # idle bonus</code></pre>
+<p>Lower is better. Idle bonus encourages matching stationary vehicles
+(not ones mid-trip).</p>
+<h3 id="matching-flow">4.3 Matching flow</h3>
+<pre><code>on trip_request(trip_id, origin_zone):
+    if trip_id in matched_set: return                   # idempotency
+    candidates = state[origin_zone]
+    if not candidates:
+        wait up to 5s (via timer)
+        candidates = union(state[z] for z in adjacent_zones[origin_zone])
+    if not candidates:
+        emit {status: &quot;no_vehicle&quot;} → processed.matches
+        write trips(status=&quot;no_vehicle&quot;) → Cassandra
+        return
+    best = argmin(cost(v) for v in candidates)
+    state[best.zone].remove(best.taxi_id)               # release lock
+    matched_set.add(trip_id)
+    emit {status: &quot;matched&quot;, taxi_id, eta, fare} → processed.matches
+    write trips(...) → Cassandra</code></pre>
+<h3 id="observed-match-rate">4.4 Observed match rate</h3>
+<p>~<strong>21%</strong> under current simulation density. The remaining
+79% are <code>no_vehicle</code> because taxis only emit GPS while on an
+active trip (the coupled-mode design). This is documented in the
+copilot-instructions as a known artifact of the simulation model —
+solvable by adding an “idle cruising” mode for off-trip taxis.</p>
+<hr />
+<h2 id="flink-processing-job-by-job">5. ⚡ Flink Processing —
+Job-by-Job</h2>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+<col style="width: 23%" />
+</colgroup>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Job 1</th>
+<th>Job 2</th>
+<th>Job 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Input</strong></td>
+<td><code>raw.gps</code></td>
+<td><code>processed.gps</code> + <code>raw.trips</code></td>
+<td><code>processed.gps</code> + <code>raw.trips</code></td>
+</tr>
+<tr>
+<td><strong>Watermark</strong></td>
+<td>BoundedOutOfOrderness 3min</td>
+<td>10s + 15s idleness</td>
+<td>10s + 15s idleness</td>
+</tr>
+<tr>
+<td><strong>Key</strong></td>
+<td><code>taxi_id</code></td>
+<td><code>(city, zone_id)</code></td>
+<td><code>zone_id</code></td>
+</tr>
+<tr>
+<td><strong>State</strong></td>
+<td><code>ValueState&lt;last_ts&gt;</code> TTL 5m</td>
+<td>none (window-scoped)</td>
+<td><code>MapState&lt;zone_id, vehicles&gt;</code> TTL 60s</td>
+</tr>
+<tr>
+<td><strong>Window</strong></td>
+<td>none (per-event)</td>
+<td><code>Tumbling(30s)</code> event-time</td>
+<td>none + 5s processing-time timer</td>
+</tr>
+<tr>
+<td><strong>Transforms</strong></td>
+<td>dedup → bounds/speed check → h3→zone → centroid+jitter snap</td>
+<td><code>COUNT(DISTINCT taxi_id)</code>, <code>COUNT(trips)</code>,
+ratio</td>
+<td>nearest-neighbor score + adjacency fallback</td>
+</tr>
+<tr>
+<td><strong>Cassandra sink</strong></td>
+<td><code>vehicle_positions</code> (TTL 24h)</td>
+<td><code>demand_zones</code> (TTL 7d)</td>
+<td><code>trips</code> (no TTL)</td>
+</tr>
+<tr>
+<td><strong>Kafka sink</strong></td>
+<td><code>processed.gps</code></td>
+<td><code>processed.demand</code></td>
+<td><code>processed.matches</code></td>
+</tr>
+<tr>
+<td><strong>Checkpoint</strong></td>
+<td>RocksDB → <code>s3a://curated/flink-checkpoints/</code> every 60s,
+EXACTLY_ONCE</td>
+<td>same</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<h3 id="duplicate-handling">5.1 Duplicate handling</h3>
+<ul>
+<li><strong>GPS</strong>: <code>last_ts</code> state skip — vehicles
+ping every 4s but Kafka retries can replay; any
+<code>event_time ≤ last_seen</code> is dropped.</li>
+<li><strong>Windowing correctness</strong>: Job 2 counts
+<code>DISTINCT taxi_id</code> (not raw ping count) — the P6 fix recorded
+in the commit log. Without this, a taxi emitting 7 pings in 30s would
+inflate <code>active_vehicles</code> by 7×.</li>
+<li><strong>Trip matching</strong>: dual defense — Cassandra
+<code>IF NOT EXISTS</code> + in-memory matched set.</li>
+</ul>
+<h3 id="late-events">5.2 Late events</h3>
+<p>Producer injects 5% blackouts with 60–180s delay. Flink’s 3-min
+watermark accepts all of these; anything beyond 3min is dropped.
+Verified by <code>scripts/test_late_events.py</code> which sends a
+2-min-old event (accepted) and a 5-min-old event (dropped).</p>
+<h3 id="gps-normalizer-centroid-snap-anonymization">5.3 GPS Normalizer
+centroid snap (anonymization)</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Deterministic jitter per taxi_id (hash-based):</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>h <span class="op">=</span> <span class="bu">int</span>(hashlib.md5(taxi_id.encode()).hexdigest()[:<span class="dv">8</span>], <span class="dv">16</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>angle <span class="op">=</span> (h <span class="op">%</span> <span class="dv">360</span>) <span class="op">*</span> math.pi <span class="op">/</span> <span class="dv">180</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>radius <span class="op">=</span> <span class="fl">0.0008</span> <span class="op">+</span> (h <span class="op">%</span> <span class="dv">1000</span>) <span class="op">/</span> <span class="fl">1e6</span>      <span class="co"># ~80–180m in degrees</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>jitter_lat <span class="op">=</span> radius <span class="op">*</span> math.cos(angle)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>jitter_lon <span class="op">=</span> radius <span class="op">*</span> math.sin(angle)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>display_lat <span class="op">=</span> centroid_lat <span class="op">+</span> jitter_lat</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>display_lon <span class="op">=</span> centroid_lon <span class="op">+</span> jitter_lon</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Clamp to zone bounds</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>display_lat <span class="op">=</span> clamp(display_lat, zone_bounds.lat_min, zone_bounds.lat_max)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>display_lon <span class="op">=</span> clamp(display_lon, zone_bounds.lon_min, zone_bounds.lon_max)</span></code></pre></div>
+<p>Privacy: all vehicles snap to centroid; usability: stable per-taxi
+jitter spreads dots on the Grafana map.</p>
+<hr />
+<h2 id="dataset-generation">6. 🧱 Dataset Generation</h2>
+<p>Live Kafka events come from <strong>three offline
+artifacts</strong>:</p>
+<table>
+<colgroup>
+<col style="width: 22%" />
+<col style="width: 43%" />
+<col style="width: 20%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Script / Notebook</th>
+<th>Content</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>casa_trip_requests.parquet</code></td>
+<td><code>04_nyc_to_casa_synthesis.ipynb</code></td>
+<td>500k trips, 90 days, NYC fingerprint × Casa spatial weights</td>
+<td>~30 MiB</td>
+</tr>
+<tr>
+<td><code>curated_trajectories_v4.parquet</code></td>
+<td><code>03_porto_trajectory_warping.ipynb</code></td>
+<td>500 OSRM polylines stratified by AE tier pair</td>
+<td>~5 MiB</td>
+</tr>
+<tr>
+<td><code>gps_trajectory_index.json</code></td>
+<td><code>scripts/build_trajectory_index.py</code></td>
+<td>Lookup: zone-pair (160) + tier-pair (25) → polyline indices</td>
+<td>2.35 MiB</td>
+</tr>
+</tbody>
+</table>
+<h3 id="synthesis-assumptions">6.1 Synthesis assumptions</h3>
+<ol type="1">
+<li><strong>NYC temporal curve transfers</strong> — peak hours, DoW
+pattern, log-normal trip durations, ~20% same-zone ratio.</li>
+<li><strong>HCP population is the dominant origin weight</strong> —
+modulated by AE multipliers
+<code>{A:1.8, B:1.3, C:1.0, D:0.7, E:0.5}</code>.</li>
+<li><strong>Moroccan fleet model</strong>:
+<code>haversine &lt; 2km → petit (70%)</code>, else
+<code>grand (30%)</code>. Petit: metered 7 MAD + 1.6/km. Grand: fixed
+10–40 MAD.</li>
+<li><strong>Wall-clock rebase</strong> — parquet event_time is
+re-anchored to “now” at producer start so Flink watermarks and Cassandra
+TTLs function in real-time.</li>
+</ol>
+<h3 id="replay-cadence">6.2 Replay cadence</h3>
+<ul>
+<li><code>--speed 50</code> default → 1 wall-clock hour = 50 simulated
+hours.</li>
+<li><code>--fleet-size 2000</code> → sustains ≥150 concurrent active
+taxis for healthy match rate.</li>
+<li>Ping interval: 4s between GPS pings per active trip.</li>
+</ul>
+<hr />
+<h2 id="file-by-file-breakdown">7. 📁 File-by-File Breakdown</h2>
+<h3 id="producers">7.1 Producers</h3>
+<ul>
+<li><strong><code>producers/config.py</code></strong> — shared
+constants: Kafka bootstrap, topic names, Casa bbox, H3 lookup loader,
+zone-mapping path, coupled-mode enums.</li>
+<li><strong><code>producers/vehicle_gps_producer.py</code></strong> —
+two modes: <code>coupled</code> (default, replays Phase-4 trips on
+Phase-2 polylines) and <code>live</code> (random-walk within zone).
+Emits GPS JSON to <code>raw.gps</code> with 4s cadence, ±20m jitter, 5%
+blackout.</li>
+<li><strong><code>producers/trip_request_producer.py</code></strong> —
+two modes: <code>casa_synth</code> (default, reads
+<code>casa_trip_requests.parquet</code>) and <code>random</code>
+(synthetic uniform). Emits trip JSON to <code>raw.trips</code> at
+wall-clock-scaled rate.</li>
+<li><strong><code>producers/Dockerfile</code></strong> —
+python:3.11-slim + kafka-python + h3 + pandas + pyarrow.</li>
+</ul>
+<h3 id="flink">7.2 Flink</h3>
+<ul>
+<li><strong><code>flink/jobs/gps_normalizer.py</code></strong> — Job 1
+(dedup, validate, zone, anonymize).</li>
+<li><strong><code>flink/jobs/demand_aggregator.py</code></strong> — Job
+2 (tumbling window, distinct count).</li>
+<li><strong><code>flink/jobs/trip_matcher.py</code></strong> — Job 3
+(stateful matching + adjacency fallback).</li>
+<li><strong><code>flink/jobs/zone_data.py</code></strong> — shared:
+loads zone CSV, H3 lookup, zone centroids, bounds, adjacency.</li>
+<li><strong><code>flink/entrypoint-wrapper.sh</code></strong> — copies
+mounted extra JARs (s3, kafka, cassandra connectors) into
+<code>/opt/flink/lib/</code> before starting Flink.</li>
+</ul>
+<h3 id="spark">7.3 Spark</h3>
+<ul>
+<li><strong><code>spark/etl_porto.py</code></strong> — Porto CSV → dedup
+→ bbox transform → validate → Parquet at
+<code>s3a://curated/trips/</code> partitioned by
+<code>year_month</code>.</li>
+<li><strong><code>spark/etl_nyc.py</code></strong> — 3 months NYC
+Parquet → schema-drift normalization → outlier filter → per-zone/hour
+aggregation.</li>
+<li><strong><code>spark/compute_kpis.py</code></strong> — 6 KPI
+datasets: <code>trips_per_zone</code>, <code>hourly_demand</code>,
+<code>daily_pattern</code>, <code>zone_hour_heatmap</code>,
+<code>coverage_gaps</code>, <code>call_type_breakdown</code>.</li>
+<li><strong><code>spark/feature_engineering.py</code></strong> — 30-min
+slot aggregation, <code>demand_lag_1d/7d</code>,
+<code>rolling_7d_mean</code> → <code>s3a://mldata/features/</code>.</li>
+<li><strong><code>spark/train_demand_model.py</code></strong> — GBT
+training (maxDepth=5, maxIter=50), temporal split, beats naive baseline
+by 45.8% (RMSE 3.71 vs 6.84).</li>
+</ul>
+<h3 id="scripts-highlights">7.4 Scripts (highlights)</h3>
+<ul>
+<li><strong><code>build_trajectory_index.py</code></strong> — builds
+dual-key lookup JSON for coupled mode.</li>
+<li><strong><code>build_arrondissement_polygons_v4.py</code></strong> —
+9 OSM + 7 Voronoi zones.</li>
+<li><strong><code>submit-flink-jobs.ps1</code></strong> /
+<strong><code>verify-flink-jobs.ps1</code></strong> — deployment +
+end-to-end health.</li>
+<li><strong><code>register-connectors.ps1</code></strong> — Kafka
+Connect S3 Sink REST registration.</li>
+<li><strong><code>ensure-cassandra-schema.ps1</code></strong> —
+idempotent schema migration.</li>
+<li><strong><code>test_late_events.py</code></strong> — watermark
+validation.</li>
+</ul>
+<h3 id="notebooks">7.5 Notebooks</h3>
+<table>
+<colgroup>
+<col style="width: 52%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>Notebook</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>01_porto_eda.ipynb</code></td>
+<td>Porto EDA: schema, durations (median 14min), call types (A/B/C
+12/48/40%), peak hours</td>
+</tr>
+<tr>
+<td><code>02_zone_remapping_v4.ipynb</code></td>
+<td><strong>Current</strong> — 16 zones × A–E scoring with
+Glovo+HCP+OSM</td>
+</tr>
+<tr>
+<td><code>03_porto_trajectory_warping.ipynb</code></td>
+<td>7-stage Porto→Casa warping with OSRM</td>
+</tr>
+<tr>
+<td><code>03_h3_zone_remapping.ipynb</code></td>
+<td>H3-based zone alternative (not adopted)</td>
+</tr>
+<tr>
+<td><code>04_nyc_etl_and_ml.ipynb</code></td>
+<td>NYC ETL + GBT training exploration</td>
+</tr>
+<tr>
+<td><code>04_nyc_to_casa_synthesis.ipynb</code></td>
+<td><strong>Current</strong> — 500k Casa trip synthesis from NYC
+fingerprint</td>
+</tr>
+</tbody>
+</table>
+<h3 id="api">7.6 API</h3>
+<ul>
+<li><strong><code>api/main.py</code></strong> — FastAPI + JWT (HS256,
+24h, <code>rider</code>/<code>admin</code> roles). Endpoints:
+<code>POST /api/demand/forecast</code> (loads GBT at startup,
+&lt;500ms), <code>GET /api/vehicles/{zone_id}</code>,
+<code>POST /api/trips</code>, <code>GET /api/health</code>.</li>
+</ul>
+<hr />
+<h2 id="storage-layer">8. 🗄️ Storage Layer</h2>
+<h3 id="cassandra-keyspace-taasim">8.1 Cassandra (keyspace
+<code>taasim</code>)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 29%" />
+<col style="width: 22%" />
+<col style="width: 10%" />
+<col style="width: 22%" />
+</colgroup>
+<thead>
+<tr>
+<th>Table</th>
+<th>Partition Key</th>
+<th>Clustering</th>
+<th>TTL</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vehicle_positions</code></td>
+<td><code>(city, zone_id)</code></td>
+<td><code>event_time DESC, taxi_id ASC</code></td>
+<td>24h</td>
+<td>Grafana queries “vehicles in zone X right now” → single partition
+scan</td>
+</tr>
+<tr>
+<td><code>trips</code></td>
+<td><code>(city, date_bucket)</code></td>
+<td><code>created_at DESC, trip_id ASC</code></td>
+<td>none</td>
+<td>Historical archive; <code>date_bucket</code> prevents unbounded
+partitions</td>
+</tr>
+<tr>
+<td><code>demand_zones</code></td>
+<td><code>(city, zone_id)</code></td>
+<td><code>window_start DESC</code></td>
+<td>7d</td>
+<td>Heatmap queries “recent demand for zone X” → single partition</td>
+</tr>
+</tbody>
+</table>
+<p>All partition keys are query-driven (not normalization-driven), per
+Cassandra best practice. Documented in <a
+href="07_adr_v1.md">07_adr_v1.md</a>.</p>
+<h3 id="minio-s3">8.2 MinIO (S3)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 22%" />
+</colgroup>
+<thead>
+<tr>
+<th>Bucket/Prefix</th>
+<th>Writer</th>
+<th>Reader</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>raw/porto-trips/</code></td>
+<td>Manual</td>
+<td>Spark ETL</td>
+<td>1.8 GiB CSV</td>
+</tr>
+<tr>
+<td><code>raw/nyc-tlc/</code></td>
+<td>Manual</td>
+<td>Spark ETL</td>
+<td>150 MiB Parquet (3 months)</td>
+</tr>
+<tr>
+<td><code>raw/kafka-archive/</code></td>
+<td>Kafka Connect S3 Sink</td>
+<td>Spark ETL / replay</td>
+<td>Mirror of <code>raw.gps</code> + <code>raw.trips</code></td>
+</tr>
+<tr>
+<td><code>curated/trips/</code></td>
+<td>Spark ETL</td>
+<td>Spark ML</td>
+<td>Cleaned geo-enriched Parquet</td>
+</tr>
+<tr>
+<td><code>curated/flink-checkpoints/</code></td>
+<td>Flink</td>
+<td>Flink (recovery)</td>
+<td>RocksDB state</td>
+</tr>
+<tr>
+<td><code>mldata/features/</code></td>
+<td>Spark</td>
+<td>Spark MLlib</td>
+<td>Feature matrix</td>
+</tr>
+<tr>
+<td><code>mldata/models/demand_v1/</code></td>
+<td>Spark MLlib</td>
+<td>FastAPI</td>
+<td>PipelineModel</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="monitoring-grafana">9. 📊 Monitoring (Grafana)</h2>
+<p><strong>Dashboard</strong> (<a
+href="../config/grafana-dashboard.json">../config/grafana-dashboard.json</a>):
+Cassandra datasource plugin
+(<code>hadesarchitect-cassandra-datasource</code>).</p>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 30%" />
+<col style="width: 39%" />
+</colgroup>
+<thead>
+<tr>
+<th>Panel</th>
+<th>Query</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vehicle Geomap</td>
+<td><code>SELECT lat, lon, taxi_id FROM vehicle_positions WHERE city='casablanca' AND zone_id IN (1..16)</code></td>
+<td>Live taxi dots on Casa map</td>
+</tr>
+<tr>
+<td>Zone Demand Bar</td>
+<td><code>SELECT zone_id, pending_requests, active_vehicles FROM demand_zones</code>
+(latest per zone)</td>
+<td>Supply/demand per zone</td>
+</tr>
+<tr>
+<td>Match Events Table</td>
+<td><code>SELECT created_at, trip_id, status, eta_seconds FROM trips</code></td>
+<td>Recent trip outcomes</td>
+</tr>
+<tr>
+<td>KPI Heatmap</td>
+<td>Grid of zone × hour demand</td>
+<td>Demand rhythm</td>
+</tr>
+</tbody>
+</table>
+<p>Refresh every 5s. Measured live SLAs: GPS freshness ≈ 4s (target
+&lt;15s ✅), match P95 ≈ 1.2s (target &lt;5s ✅).</p>
+<hr />
+<h2 id="critical-evaluation">10. 📌 Critical Evaluation</h2>
+<h3 id="weaknesses-unrealistic-assumptions">10.1 Weaknesses /
+unrealistic assumptions</h3>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 23%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Severity</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Only 9/16 zones are “real”</strong> — 7 are Voronoi
+approximations where OSM lacks clean admin polygons</td>
+<td>Medium</td>
+<td><a
+href="13_remapping_and_synthesis_deep_dive.md">13_remapping_and_synthesis_deep_dive.md</a>
+§3.2</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>HCP non-population indicators are province-uniform</strong>
+across all 16 zones (fertility, literacy, household size)</td>
+<td>Medium</td>
+<td><code>scripts/hcp_loader.py</code> returns single dict</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>AE transition matrix is theoretical, not measured</strong> —
+we don’t have Casa OD ground truth</td>
+<td>Medium</td>
+<td><code>03_porto_trajectory_warping.ipynb</code> §4.4</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Only 500 polyline templates</strong> for 500k trips → each
+polyline is reused ~1000×</td>
+<td>Medium</td>
+<td><code>gps_trajectory_index.json</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Taxis emit GPS only during active trips</strong> → ~79%
+<code>no_vehicle</code> match rate</td>
+<td>High</td>
+<td>Job 3 state model</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Linear bbox transform distorts Porto’s 39×9km footprint into
+Casa’s 23×26km</strong></td>
+<td>Low (mitigated by OSRM re-routing)</td>
+<td><code>etl_porto.py::transform_coord</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Centroid anonymization loses precision</strong> — every taxi
+shown at zone centroid + jitter, not real position</td>
+<td>By design (privacy) — but limits analytic value</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>No weather / traffic / events features</strong> in ML
+model</td>
+<td>Medium</td>
+<td><code>feature_engineering.py</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Kafka Connect has no dead-letter queue</strong> configured —
+malformed events silently drop</td>
+<td>Low</td>
+<td><code>connect-s3-sink-gps.json</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>No Kafka topic ACLs</strong> — cahier §6.3
+<code>raw.*</code> producer-only ACL not yet applied</td>
+<td>Medium (Week 7 pending)</td>
+<td>master status</td>
+</tr>
+</tbody>
+</table>
+<h3 id="concrete-improvements-prioritized">10.2 Concrete improvements
+(prioritized)</h3>
+<ol type="1">
+<li><strong>Add idle-cruising mode to GPS producer</strong> — when not
+on a trip, fleet emits random-walk pings within assigned zone. Raises
+match rate from 21% → ~70%.</li>
+<li><strong>Weight polyline reuse by tier-pair rarity</strong> — current
+index picks uniformly from matches; tier-pair-aware sampling prevents
+over-reuse of 5 A→A polylines.</li>
+<li><strong>Introduce per-arrondissement HCP interpolation</strong> —
+use spatial demographic smoothing (e.g., dasymetric mapping via Glovo
+commerce as covariate) to vary non-population indicators across
+zones.</li>
+<li><strong>Add a DLQ topic</strong> (<code>raw.gps.dlq</code>) and JMX
+metric for parse failures.</li>
+<li><strong>Add Kafka SASL + ACLs</strong> per cahier §6.3 — Week
+7.</li>
+<li><strong>Add weather/traffic enrichment</strong> — OpenWeatherMap API
++ Casa holiday calendar in ML features; likely pushes R² from 0.75 →
+~0.85.</li>
+<li><strong>Upgrade zone polygons to v5</strong> using paid HCP/admin
+cadastral data for all 16 arrondissements (eliminate Voronoi
+fallback).</li>
+<li><strong>Implement checkpoint-recovery demo</strong> — kill Flink TM,
+verify Job 1 resumes from MinIO checkpoint (cahier §3.3 demo
+requirement, still pending).</li>
+<li><strong>Stress test</strong>: run producer at
+<code>--speed 500</code> for 10 min; measure Kafka lag + Cassandra write
+latency under burst.</li>
+<li><strong>Replace in-memory <code>matched_set</code></strong> in Job 3
+with Flink keyed state — current Set leaks memory at scale (reset at 50k
+is a hack).</li>
+</ol>
+<h3 id="whats-genuinely-strong">10.3 What’s genuinely strong</h3>
+<ul>
+<li>Clean Kappa boundary — NYC never touches Kafka; cahier compliance is
+provable.</li>
+<li>Real OSRM road-following polylines — no building-crossing
+artifacts.</li>
+<li>Measurable ground-truth calibration — A/E ratio 3.65× matches HCP
+income data.</li>
+<li>Full offline reproducibility — every artifact derives from versioned
+notebook + script.</li>
+<li>Proper ML hygiene — temporal split, baseline comparison (45.8%
+gain), model versioning.</li>
+<li>Cassandra schema is query-driven with justified partition keys.</li>
+</ul>
+<hr />
+<h2 id="tldr">TL;DR</h2>
+<p>TaaSim is a textbook Kappa streaming stack where the <strong>creative
+engineering is front-loaded</strong> (phases 1–4 data synthesis) and the
+<strong>live pipeline is deliberately boring</strong> (standard Flink
+event-time, watermarks, stateful joins, Cassandra serving). The system
+is architecturally sound and cahier-compliant; its main weaknesses are
+data-realism (Voronoi zones, theoretical OD matrix, 500 polyline
+templates, GPS only during active trips) — all tractable with
+incremental improvements that don’t require re-architecting.</p>
+</body>
+</html>

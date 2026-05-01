@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>05_task_kafka_producers</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#task-5---kafka-producers"
+id="toc-task-5---kafka-producers">Task 5 - Kafka Producers</a>
+<ul>
+<li><a href="#objective" id="toc-objective">Objective</a></li>
+<li><a href="#delivered" id="toc-delivered">Delivered</a></li>
+<li><a href="#features-implemented"
+id="toc-features-implemented">Features Implemented</a></li>
+<li><a href="#current-smoke-test-result"
+id="toc-current-smoke-test-result">Current Smoke Test Result</a></li>
+<li><a href="#conclusion" id="toc-conclusion">Conclusion</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="task-5---kafka-producers">Task 5 - Kafka Producers</h1>
+<p>Status: Implemented and previously validated; current smoke test
+blocked by Docker daemon Last updated: 2026-04-03</p>
+<h2 id="objective">Objective</h2>
+<p>Implement realtime simulation producers for GPS and trip
+requests.</p>
+<h2 id="delivered">Delivered</h2>
+<ul>
+<li>producers/vehicle_gps_producer.py</li>
+<li>producers/trip_request_producer.py</li>
+<li>producers/config.py</li>
+</ul>
+<h2 id="features-implemented">Features Implemented</h2>
+<h3 id="vehicle_gps_producer.py">vehicle_gps_producer.py</h3>
+<ul>
+<li>Replays GPS trajectories from Porto source data</li>
+<li>Applies Porto -&gt; Casablanca transform</li>
+<li>Adds controlled coordinate noise</li>
+<li>Supports realistic event timing behavior</li>
+</ul>
+<h3 id="trip_request_producer.py">trip_request_producer.py</h3>
+<ul>
+<li>Emits synthetic trip request events</li>
+<li>Uses zone mapping for origin/destination zones</li>
+<li>Supports demand-driven generation behavior</li>
+</ul>
+<h2 id="current-smoke-test-result">Current Smoke Test Result</h2>
+<ul>
+<li>Command was run with max-trips=5</li>
+<li>Failure: kafka.errors.NoBrokersAvailable</li>
+<li>Root cause: Docker daemon is unavailable in this session, so Kafka
+is not reachable</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<ul>
+<li>Producer code is in place and integrated with new mapping</li>
+<li>Runtime infrastructure must be restarted for final live
+verification</li>
+</ul>
+</body>
+</html>

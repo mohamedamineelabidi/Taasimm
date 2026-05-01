@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>09_week5_spark_etl</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#week-5-spark-etl-porto-nyc-batch-processing-kpi-analytics"
+id="toc-week-5-spark-etl-porto-nyc-batch-processing-kpi-analytics">Week
+5 — Spark ETL: Porto + NYC Batch Processing + KPI Analytics</a>
+<ul>
+<li><a href="#task-1-porto-etl-etl_porto.py"
+id="toc-task-1-porto-etl-etl_porto.py">Task 1: Porto ETL
+(etl_porto.py)</a></li>
+<li><a href="#task-2-nyc-tlc-etl-etl_nyc.py"
+id="toc-task-2-nyc-tlc-etl-etl_nyc.py">Task 2: NYC TLC ETL
+(etl_nyc.py)</a></li>
+<li><a href="#task-3-kpi-analytics-compute_kpis.py"
+id="toc-task-3-kpi-analytics-compute_kpis.py">Task 3: KPI Analytics
+(compute_kpis.py)</a></li>
+<li><a href="#infrastructure-notes"
+id="toc-infrastructure-notes">Infrastructure Notes</a></li>
+<li><a href="#minio-curated-bucket-summary"
+id="toc-minio-curated-bucket-summary">MinIO Curated Bucket
+Summary</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="week-5-spark-etl-porto-nyc-batch-processing-kpi-analytics">Week
+5 — Spark ETL: Porto + NYC Batch Processing + KPI Analytics</h1>
+<p><strong>Status</strong>: COMPLETED<br />
+<strong>Date</strong>: 2026-04-19</p>
+<h2 id="task-1-porto-etl-etl_porto.py">Task 1: Porto ETL
+(etl_porto.py)</h2>
+<p><strong>Input</strong>: <code>s3a://raw/porto-trips/train.csv</code>
+(1.8 GiB, 1,710,670 rows)<br />
+<strong>Output</strong>: <code>s3a://curated/trips/</code> (43 MiB, 12
+monthly Parquet partitions)</p>
+<h3 id="pipeline">Pipeline</h3>
+<ol type="1">
+<li>Read CSV from MinIO (Porto taxi GPS trajectories)</li>
+<li>Deduplicate by TRIP_ID → 1,710,589 unique trips</li>
+<li>Parse POLYLINE JSON → extract origin/destination coordinates</li>
+<li>Bounding-box transform: Porto → Casablanca (linear mapping +
+Gaussian noise σ=0.0002°)</li>
+<li>Zone assignment: 16 irregular Casablanca arrondissements via
+zone_mapping.csv</li>
+<li>Temporal feature extraction: hour_of_day, day_of_week, is_weekend,
+year_month</li>
+<li>Validation filters: duration 30s–7200s, distance 0.1–50 km</li>
+<li>Write Parquet partitioned by year_month</li>
+</ol>
+<h3 id="results">Results</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw rows</td>
+<td>1,710,670</td>
+</tr>
+<tr>
+<td>After dedup</td>
+<td>1,710,589</td>
+</tr>
+<tr>
+<td>Valid trips</td>
+<td>1,660,794</td>
+</tr>
+<tr>
+<td>Avg duration</td>
+<td>577.5 sec</td>
+</tr>
+<tr>
+<td>Avg distance</td>
+<td>7.27 km</td>
+</tr>
+<tr>
+<td>Output size</td>
+<td>43 MiB</td>
+</tr>
+<tr>
+<td>Partitions</td>
+<td>12 (2013-07 to 2014-06)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-2-nyc-tlc-etl-etl_nyc.py">Task 2: NYC TLC ETL
+(etl_nyc.py)</h2>
+<p><strong>Input</strong>: <code>s3a://raw/nyc-tlc/</code> (3 Parquet
+files, ~146 MiB, Jan–Mar 2024)<br />
+<strong>Output</strong>: <code>s3a://curated/nyc-demand/</code> (4.3
+MiB, 4 Parquet partitions)</p>
+<h3 id="schema-drift-resolution">Schema Drift Resolution</h3>
+<p>NYC TLC files have schema inconsistencies across months: -
+<code>passenger_count</code>: DOUBLE (Jan/Feb) vs INT64 (Mar) -
+<code>VendorID</code>: BIGINT (Jan/Feb) vs INT (Mar) -
+<code>RatecodeID</code>: DOUBLE (Jan/Feb) vs BIGINT (Mar) -
+<code>PULocationID</code>: BIGINT (Jan/Feb) vs INT (Mar) -
+<code>Airport_fee</code> (Mar) vs <code>airport_fee</code> (Jan/Feb) —
+case drift</p>
+<p><strong>Solution</strong>: Per-file reading with
+<code>read_and_normalize()</code> — COMMON_COLS as
+<code>(name, cast_type)</code> tuples, lazy column building via
+<code>functools.reduce(DataFrame.unionByName, dfs)</code>.</p>
+<h3 id="pipeline-1">Pipeline</h3>
+<ol type="1">
+<li>Read each Parquet file individually with schema normalization</li>
+<li>Cast all columns to common types (long for IDs, double for
+amounts)</li>
+<li>Handle Airport_fee → airport_fee case rename</li>
+<li>Union all months via <code>unionByName</code></li>
+<li>Clean: trip_distance 0–100mi, fare 0–500, passenger_count &gt;
+0</li>
+<li>Compute temporal features + trip_duration_sec</li>
+<li>Aggregate: per-zone per-hour demand (PULocationID, hour_of_day,
+day_of_week)</li>
+<li>Write demand aggregates to Parquet</li>
+</ol>
+<h3 id="results-1">Results</h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raw rows</td>
+<td>9,384,487</td>
+</tr>
+<tr>
+<td>Cleaned rows</td>
+<td>8,807,357</td>
+</tr>
+<tr>
+<td>Removed</td>
+<td>577,130 (6.1%)</td>
+</tr>
+<tr>
+<td>Demand agg rows</td>
+<td>192,916</td>
+</tr>
+<tr>
+<td>Avg fare</td>
+<td>$18.72</td>
+</tr>
+<tr>
+<td>Avg trip distance</td>
+<td>(NYC miles)</td>
+</tr>
+<tr>
+<td>Avg duration</td>
+<td>978 sec</td>
+</tr>
+<tr>
+<td>Output size</td>
+<td>4.3 MiB</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="task-3-kpi-analytics-compute_kpis.py">Task 3: KPI Analytics
+(compute_kpis.py)</h2>
+<p><strong>Input</strong>: <code>s3a://curated/trips/</code> (Porto
+curated, 1,228,061 trips)<br />
+<strong>Output</strong>: <code>s3a://curated/kpis/</code> (6
+datasets)</p>
+<h3 id="kpi-datasets">KPI Datasets</h3>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Rows</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trips_per_zone/</code></td>
+<td>16</td>
+<td>Trip count, avg duration/distance per zone</td>
+</tr>
+<tr>
+<td><code>hourly_demand/</code></td>
+<td>24</td>
+<td>Hourly demand curve</td>
+</tr>
+<tr>
+<td><code>daily_pattern/</code></td>
+<td>7</td>
+<td>Day-of-week trip patterns</td>
+</tr>
+<tr>
+<td><code>zone_hour_heatmap/</code></td>
+<td>384</td>
+<td>Zone × hour demand matrix</td>
+</tr>
+<tr>
+<td><code>coverage_gaps/</code></td>
+<td>183</td>
+<td>Zone-hour combos with &lt; 10% supply/demand</td>
+</tr>
+<tr>
+<td><code>call_type_breakdown/</code></td>
+<td>3</td>
+<td>Trip distribution by call type</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-findings">Key Findings</h3>
+<ul>
+<li><strong>Peak hour</strong>: 14:00 (69,023 trips)</li>
+<li><strong>Busiest day</strong>: Friday (200,660 trips)</li>
+<li><strong>Quietest day</strong>: Sunday (171,094 trips, avg 487s —
+shorter weekend trips)</li>
+<li><strong>Coverage gaps</strong>: 183 zone-hour combos with &lt; 10%
+supply/demand ratio</li>
+<li><strong>Worst coverage</strong>: Ain Chock at 3 AM (1.7% ratio), Ben
+Msik at 3 AM (2.7%)</li>
+<li><strong>All 16 zones</strong> represented in curated data</li>
+</ul>
+<hr />
+<h2 id="infrastructure-notes">Infrastructure Notes</h2>
+<ul>
+<li>Spark worker RAM increased: 2 GB → 4 GB (5 GB limit) to prevent
+Docker OOM</li>
+<li>Spark master: 3 GB memory limit added</li>
+<li>SPARK_DRIVER_MEMORY: 2 GB</li>
+<li>All 3 jobs ran without Docker crashes after memory increase</li>
+<li>Porto ETL: ~3 min runtime</li>
+<li>NYC ETL: ~15 sec runtime<br />
+</li>
+<li>KPI job: ~12 sec runtime (exit code 0)</li>
+</ul>
+<h2 id="minio-curated-bucket-summary">MinIO Curated Bucket Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Size</th>
+<th>Objects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>curated/trips/</code></td>
+<td>43 MiB</td>
+<td>13</td>
+</tr>
+<tr>
+<td><code>curated/nyc-demand/</code></td>
+<td>4.3 MiB</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>curated/kpis/</code></td>
+<td>~15 KiB</td>
+<td>12</td>
+</tr>
+<tr>
+<td><strong>Total curated/</strong></td>
+<td><strong>49 MiB</strong></td>
+<td><strong>59</strong></td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>00_master_status</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#taasim-project-master-status"
+id="toc-taasim-project-master-status">TaaSim Project Master Status</a>
+<ul>
+<li><a href="#global-progress" id="toc-global-progress">Global
+Progress</a></li>
+<li><a href="#task-board-week-1" id="toc-task-board-week-1">Task Board —
+Week 1</a></li>
+<li><a href="#task-board-week-2" id="toc-task-board-week-2">Task Board —
+Week 2</a></li>
+<li><a href="#task-board-week-3" id="toc-task-board-week-3">Task Board —
+Week 3</a></li>
+<li><a href="#task-board-week-5-spark-etl"
+id="toc-task-board-week-5-spark-etl">Task Board — Week 5 (Spark
+ETL)</a></li>
+<li><a href="#task-board-week-6-ml-pipeline"
+id="toc-task-board-week-6-ml-pipeline">Task Board — Week 6 (ML
+Pipeline)</a></li>
+<li><a href="#evidence-files" id="toc-evidence-files">Evidence
+Files</a></li>
+<li><a href="#cahier-des-charges-compliance-matrix"
+id="toc-cahier-des-charges-compliance-matrix">Cahier-des-charges
+Compliance Matrix</a></li>
+<li><a href="#current-state-summary"
+id="toc-current-state-summary">Current State Summary</a></li>
+<li><a href="#week-3-verification-summary-2026-04-17"
+id="toc-week-3-verification-summary-2026-04-17">Week 3 Verification
+Summary (2026-04-17)</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="taasim-project-master-status">TaaSim Project Master Status</h1>
+<p>Last updated: 2026-04-19 Project: TaaSim (Transport as a Service) -
+Casablanca</p>
+<h2 id="global-progress">Global Progress</h2>
+<ul>
+<li>Week 1 / Sprint 1: COMPLETED</li>
+<li>Week 2 / Sprint 2: COMPLETED</li>
+<li>Week 3 / Sprint 3: COMPLETED</li>
+<li>Week 5 / Spark ETL: COMPLETED</li>
+<li>Week 6 / ML Pipeline: COMPLETED</li>
+<li>Currently targeting: Week 7 (Security, integration tests, SLA)</li>
+</ul>
+<h2 id="task-board-week-1">Task Board — Week 1</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Task 1: Docker Compose
+stack provisioning</label></li>
+<li><label><input type="checkbox" checked="" />Task 2: Dataset download
+and upload to MinIO</label></li>
+<li><label><input type="checkbox" checked="" />Task 3: Porto EDA
+notebook</label></li>
+<li><label><input type="checkbox" checked="" />Task 4: Zone remapping
+Porto -&gt; Casablanca (v5 geographic redesign, Gini 0.275)</label></li>
+<li><label><input type="checkbox" checked="" />Task 5: Kafka producers
+(GPS + trip requests)</label></li>
+</ul>
+<h2 id="task-board-week-2">Task Board — Week 2</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Task 1: Kafka Connect S3
+Sink (raw.gps + raw.trips → kafka-archive/)</label></li>
+<li><label><input type="checkbox" checked="" />Task 2: Cassandra schema
+verified (3 tables, INSERT + SELECT tested)</label></li>
+<li><label><input type="checkbox" checked="" />Task 3: ADR v1 written
+(documents/07_adr_v1.md)</label></li>
+</ul>
+<h2 id="task-board-week-3">Task Board — Week 3</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Task 1: Flink
+checkpointing configured (RocksDB + S3/MinIO, 60s interval,
+EXACTLY_ONCE)</label></li>
+<li><label><input type="checkbox" checked="" />Task 2: Flink Job 1 — GPS
+Normalizer (PyFlink DataStream, validates, assigns zone, anonymizes to
+centroid)</label></li>
+<li><label><input type="checkbox" checked="" />Task 3: Watermark test
+(late event test script, event-time watermarks with 3-min
+lateness)</label></li>
+<li><label><input type="checkbox" checked="" />Task 4: Grafana vehicle
+map dashboard (Geomap + bar chart + table panels)</label></li>
+</ul>
+<h2 id="task-board-week-5-spark-etl">Task Board — Week 5 (Spark
+ETL)</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Task 1: Porto ETL —
+1,710,670 raw → 1,660,794 valid trips, 12 Parquet partitions (43
+MiB)</label></li>
+<li><label><input type="checkbox" checked="" />Task 2: NYC TLC ETL —
+9.38M raw → 8.81M cleaned → 192K demand agg rows (4.3 MiB)</label></li>
+<li><label><input type="checkbox" checked="" />Task 3: KPI Analytics — 6
+datasets: trips_per_zone, hourly_demand, daily_pattern,
+zone_hour_heatmap, coverage_gaps, call_type_breakdown</label></li>
+</ul>
+<h2 id="task-board-week-6-ml-pipeline">Task Board — Week 6 (ML
+Pipeline)</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" checked="" />Task 1: Feature
+Engineering — 183,981 feature rows (30-min slots, lag features, rolling
+means)</label></li>
+<li><label><input type="checkbox" checked="" />Task 2: GBT Model
+Training — RMSE 3.71, R² 0.75, 45.8% improvement over naive
+baseline</label></li>
+<li><label><input type="checkbox" checked="" />Task 3: FastAPI REST API
+— JWT auth, demand forecast, trip reservation, zone lookup</label></li>
+</ul>
+<h2 id="evidence-files">Evidence Files</h2>
+<ul>
+<li><a href="01_task_docker_stack.md">01_task_docker_stack.md</a></li>
+<li><a
+href="02_task_datasets_minio.md">02_task_datasets_minio.md</a></li>
+<li><a href="03_task_porto_eda.md">03_task_porto_eda.md</a></li>
+<li><a
+href="04_task_zone_remapping_v3.md">04_task_zone_remapping_v3.md</a></li>
+<li><a
+href="05_task_kafka_producers.md">05_task_kafka_producers.md</a></li>
+<li><a href="06_next_steps.md">06_next_steps.md</a></li>
+<li><a href="07_adr_v1.md">07_adr_v1.md</a></li>
+<li><a href="08_week3_completion.md">08_week3_completion.md</a> ← Week 3
+Verification Report</li>
+<li><a href="10_week6_ml_pipeline.md">10_week6_ml_pipeline.md</a> ← Week
+6 ML Pipeline Report</li>
+<li><a href="09_week5_spark_etl.md">09_week5_spark_etl.md</a> ← Week 5
+Spark ETL Report</li>
+</ul>
+<h2 id="cahier-des-charges-compliance-matrix">Cahier-des-charges
+Compliance Matrix</h2>
+<p>One row per grading-relevant cahier section. Status reflects current
+state on <code>test-workflow-dev</code>.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Cahier §</th>
+<th>Requirement</th>
+<th>Implementation</th>
+<th>Doc</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>§2.1</td>
+<td>Porto → Casa linear transform + 22→16 zone remap</td>
+<td>Phase 2 step 4 affine warp; 16 zones in
+<code>zone_mapping_v4.csv</code></td>
+<td><a
+href="13_remapping_and_synthesis_deep_dive.md">13_remapping_and_synthesis_deep_dive.md</a>
+§0, §4</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§2.2</td>
+<td>NYC = batch only, never streamed</td>
+<td>NYC Parquet read by Spark ETL (Week 5) and as offline fingerprint
+(Phase 3); never reaches Kafka</td>
+<td><a href="13_remapping_and_synthesis_deep_dive.md">13</a> §5.1
+box</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§2.3</td>
+<td>Lightweight simulator, ±20 m drift, 5% blackout, out-of-order up to
+3 min</td>
+<td>Producer emits Gaussian jitter σ≈20 m + 5% blackout (60–180 s
+late)</td>
+<td><a
+href="05_task_kafka_producers.md">05_task_kafka_producers.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§3.3</td>
+<td>Three Flink jobs, event-time watermarks, RocksDB, MinIO
+checkpoints</td>
+<td>Jobs 1/2/3 running, 60 s checkpoint cadence, 3-min allowed
+lateness</td>
+<td><a href="08_week3_completion.md">08_week3_completion.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§4.1</td>
+<td>Cassandra: 3 tables with partition-key justification</td>
+<td><code>cassandra-init.cql</code> + ADR</td>
+<td><a href="07_adr_v1.md">07_adr_v1.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§4.2</td>
+<td>MinIO zones raw/curated/mldata/kafka-archive</td>
+<td>All four buckets active</td>
+<td><a href="06_task_week2_storage.md">06_task_week2_storage.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§5.3</td>
+<td>ML GBT must beat naive 7-day-lag baseline; baseline-vs-model
+table</td>
+<td>RMSE 3.71 vs 6.84 (45.8% improvement)</td>
+<td><a href="10_week6_ml_pipeline.md">10_week6_ml_pipeline.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§6.1</td>
+<td>SLA targets (&lt; 5 s match P95, &lt; 15 s GPS freshness, …)</td>
+<td>Measured live: match P95 ≈ 1.2 s, GPS freshness ≈ 4 s</td>
+<td><a href="10_week6_ml_pipeline.md">10_week6_ml_pipeline.md</a> +
+Grafana</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§6.3</td>
+<td>GPS anonymization — centroid snap before Cassandra write</td>
+<td>Flink Job 1 snaps to <code>zone.centroid_lat/lon</code>; raw lat/lon
+never persisted</td>
+<td><a href="08_week3_completion.md">08_week3_completion.md</a>
+anonymization audit</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§6.3</td>
+<td>FastAPI JWT auth, 2 roles</td>
+<td><code>api/main.py</code> implements <code>rider</code> +
+<code>admin</code> roles, HS256, 24 h</td>
+<td><a href="10_week6_ml_pipeline.md">10_week6_ml_pipeline.md</a></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>§6.3</td>
+<td>Kafka topic ACLs (raw.* producers, processed.* admin)</td>
+<td>⚠ Week 7 pending</td>
+<td>—</td>
+<td>🟡 Pending</td>
+</tr>
+<tr>
+<td>Week 7</td>
+<td>Checkpoint-recovery demo (kill TM, job resumes)</td>
+<td>⚠ Recording pending</td>
+<td>—</td>
+<td>🟡 Pending</td>
+</tr>
+<tr>
+<td>Week 8</td>
+<td>Live demo + pitch deck + technical report</td>
+<td>Draft presentation [12_presentation_week6.md] exists</td>
+<td>—</td>
+<td>🟡 Pending</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Beyond-cahier extensions</strong> (none cross the Kappa
+boundary): OSRM routing, A–E tier system, HCP/Glovo spatial weights,
+trajectory index, Phase 3 NYC fingerprint synthesis. Documented in <a
+href="13_remapping_and_synthesis_deep_dive.md#11-beyond-the-cahier--what-we-added-and-why-it-is-still-in-scope">13
+§11</a>.</p>
+<hr />
+<h2 id="current-state-summary">Current State Summary</h2>
+<ul>
+<li>16 Docker containers running (Kafka, Kafka Connect, Kafka UI, MinIO,
+Cassandra, Flink JM + 3 TMs scaled, Spark, Grafana, Jupyter + init
+containers)</li>
+<li>Kafka Connect S3 Sink archiving raw.gps and raw.trips to MinIO
+kafka-archive/ bucket</li>
+<li>Cassandra schema deployed with 3 tables (vehicle_positions, trips,
+demand_zones)</li>
+<li>GPS and trip producers tested end-to-end through Kafka → S3 Sink →
+MinIO</li>
+<li><strong>Flink Job 1 (GPS Normalizer)</strong> running on cluster:
+raw.gps → validate → zone assign → centroid snap → Cassandra +
+processed.gps</li>
+<li><strong>Flink Job 2 (Demand Aggregator)</strong> running:
+processed.gps + raw.trips → 30s windowed aggregation → demand_zones
+Cassandra + processed.demand</li>
+<li><strong>Flink Job 3 (Trip Matcher)</strong> running: raw.trips +
+processed.gps → nearest vehicle match → trip assignment Cassandra +
+processed.matches</li>
+<li>Flink TaskManagers scaled to 3 instances (12 total slots, 9 slots
+occupied by 3 jobs)</li>
+<li>Flink checkpointing to MinIO (s3://curated/flink-checkpoints/)
+verified — 10+ checkpoints completed</li>
+<li>Grafana vehicle tracking dashboard deployed with Geomap, zone bar
+chart, and event table</li>
+<li>Kafka UI added to stack for topic monitoring</li>
+<li>GPS producer generating 10× replay speed from Porto dataset with
+zone remapping + noise</li>
+</ul>
+<h2 id="week-3-verification-summary-2026-04-17">Week 3 Verification
+Summary (2026-04-17)</h2>
+<p><strong>Pipeline Status</strong>: ✅ OPERATIONAL END-TO-END - All 3
+Flink jobs deployed and running successfully - Flink Web UI:
+http://localhost:8081 (showing 12 slots, 3 jobs) - TaskManagers: 3
+running (scaled deployment) - Kafka topics: raw.gps, raw.trips,
+processed.gps, processed.demand, processed.matches all active -
+Cassandra: schema verified, ready for data ingestion - MinIO:
+kafka-archive bucket receiving S3 Sink data - Grafana: dashboards
+configured, ready for visualization</p>
+<p><strong>Data Flow Confirmation</strong>: - GPS events: raw.gps topic
+active → Flink Job 1 consuming → processed.gps producing - Trip
+requests: raw.trips topic active → Flink Jobs 2, 3 consuming -
+Producers: vehicle_gps_producer.py and trip_request_producer.py tested
+(50 trips successful)</p>
+<p><strong>Infrastructure Health</strong>: - Flink JobManager: HEALTHY -
+All TaskManagers: RUNNING - Kafka: HEALTHY - Cassandra: HEALTHY - MinIO:
+HEALTHY - Grafana: RUNNING (health check starting) - Kafka UI: RUNNING
+(health check starting)</p>
+</body>
+</html>

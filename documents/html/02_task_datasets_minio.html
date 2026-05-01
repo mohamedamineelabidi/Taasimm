@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>02_task_datasets_minio</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#task-2---datasets-to-minio"
+id="toc-task-2---datasets-to-minio">Task 2 - Datasets to MinIO</a>
+<ul>
+<li><a href="#objective" id="toc-objective">Objective</a></li>
+<li><a href="#delivered" id="toc-delivered">Delivered</a></li>
+<li><a href="#outputs" id="toc-outputs">Outputs</a></li>
+<li><a href="#operational-value" id="toc-operational-value">Operational
+Value</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="task-2---datasets-to-minio">Task 2 - Datasets to MinIO</h1>
+<p>Status: Completed Last updated: 2026-04-03</p>
+<h2 id="objective">Objective</h2>
+<p>Download Porto and NYC TLC datasets and upload to MinIO raw
+layer.</p>
+<h2 id="delivered">Delivered</h2>
+<ul>
+<li>Porto dataset uploaded (CSV, about 1.8 GB)</li>
+<li>NYC TLC sample period uploaded (3 parquet files)</li>
+<li>Data organization aligned with project storage expectations</li>
+</ul>
+<h2 id="outputs">Outputs</h2>
+<ul>
+<li>data/train.csv available locally for producers and notebooks</li>
+<li>MinIO raw ingestion path already used in prior steps</li>
+</ul>
+<h2 id="operational-value">Operational Value</h2>
+<ul>
+<li>Provides source for stream simulation (Porto)</li>
+<li>Provides source for batch ETL and analytics (NYC TLC)</li>
+</ul>
+</body>
+</html>

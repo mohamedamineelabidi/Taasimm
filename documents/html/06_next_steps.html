@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>06_next_steps</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#next-steps-and-update-log"
+id="toc-next-steps-and-update-log">Next Steps and Update Log</a>
+<ul>
+<li><a href="#immediate-next-steps-week-7-security-integration"
+id="toc-immediate-next-steps-week-7-security-integration">Immediate Next
+Steps (Week 7 — Security &amp; Integration)</a></li>
+<li><a href="#pending-verifications"
+id="toc-pending-verifications">Pending Verifications</a></li>
+<li><a href="#update-log" id="toc-update-log">Update Log</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="next-steps-and-update-log">Next Steps and Update Log</h1>
+<p>Last updated: 2026-04-19</p>
+<h2 id="immediate-next-steps-week-7-security-integration">Immediate Next
+Steps (Week 7 — Security &amp; Integration)</h2>
+<ol type="1">
+<li>JWT auth hardening: rotate secrets, HTTPS/TLS for API</li>
+<li>GPS anonymization audit: verify centroid snapping in Flink Job
+1</li>
+<li>Integration test: end-to-end pipeline (producer → Flink → Cassandra
+→ API)</li>
+<li>SLA measurement: trip match &lt;5s P95, GPS freshness &lt;15s, API
+&lt;500ms at 20 req/s</li>
+<li>Checkpoint recovery test: kill Flink TM, verify resume from
+checkpoint</li>
+</ol>
+<h2 id="pending-verifications">Pending Verifications</h2>
+<ul>
+<li>Verify trip matching accuracy (nearest vehicle assignment)</li>
+<li>Verify adjacent zone fallback works when no vehicle in request
+zone</li>
+<li>Verify demand zone window triggers every 30s</li>
+<li>Verify S3 Sink archival over extended producer runs (8+ hours)</li>
+</ul>
+<h2 id="update-log">Update Log</h2>
+<ul>
+<li><p>2026-04-21: <strong>Grafana dashboard modernized</strong> — <a
+href="config/grafana-dashboard.json">config/grafana-dashboard.json</a>
+updated: title → “TaaSim — Live Pipeline (Casablanca)”, refresh 10s→5s,
+time window now-1h→now-15m, added <code>$date_bucket</code> template
+variable (custom list: 2026-04-21/20/19/18, default today). Replaced 3
+hardcoded <code>date_bucket='2026-04-19'</code> and 1
+<code>='2026-04-18'</code> in trip panels with
+<code>$date_bucket</code>. Grafana auto-reloaded via provisioning (30s
+interval). Verified via REST API: 7 panels, 1 variable, 5s refresh.
+Dashboard now shows today’s data by default and lets user switch date
+bucket from UI.</p></li>
+<li><p>2026-04-21: <strong>Match rate tuning</strong> — Increased fleet
+to 2000 taxis and producer speed to 50× (both trip + GPS producers) in
+<code>docker-compose.yml</code>. Truncated Cassandra tables for clean
+measurement. After 3 min warm-up: <strong>21.0% matched / 79.0%
+no_vehicle</strong> (2,003 matched / 7,521 unmatched), up from initial
+4.2% at fleet=500 speed=10. Flink jobs stable (25 consecutive
+checkpoints, 0 failures). All 16 zones populated. Root cause of
+remaining no_vehicle: coupled-mode taxis only emit GPS during active
+trips (~75 pings then drop); at 50× speed ~193 trips expanded in 3 min →
+~150 concurrent taxis across 16 zones. Would need idle-cruising behavior
+in GPS producer to raise further (out of scope for Week 3).</p></li>
+<li><p>2026-04-21: <strong>Flink output semantics validated</strong> —
+(1) GPS Normalizer: centroid snap confirmed (taxi_0192 consistently at
+33.60512/-7.54537 in zone 15); (2) Demand Aggregator: 30s windows emit
+per-zone
+<code>active_vehicles</code>/<code>pending_requests</code>/<code>ratio</code>
+(zone 5 sample: ratio=1 when 2 vehicles / 2 requests); (3) Trip Matcher:
+schema valid (<code>taxi_id</code>, <code>eta_seconds</code>,
+<code>fare</code>, <code>status</code>∈{matched,no_vehicle}); sample
+match fare=54.63 MAD, ETA=60s. TripFanout correctly sends trip to origin
++ adjacent zones. Matching cost = 0.7·dist_km + 0.3·idle_penalty. No
+distance cap (could add later).</p></li>
+<li><p>2026-04-21: Phase 4 wiring complete — Trip producer now replays
+casa_trip_requests.parquet via <code>--source casa_synth</code>
+(default) with wall-clock rebase + speed control; GPS producer gains
+<code>--mode coupled</code> (default) that pairs each Phase-4 trip with
+a Phase-3 OSRM polyline via
+data/casa_synthesis/gps_trajectory_index.json (500 routes, 160
+zone-pairs, 25 tier-pairs — full A–E coverage). Fleet pool 500 taxis, 4s
+ping cadence, ±20m noise + 5% blackout preserved. Smoke-tested locally
+(5 trips → 29 GPS events). New file scripts/build_trajectory_index.py.
+Edited files: producers/config.py (paths),
+producers/trip_request_producer.py (run_from_parquet),
+producers/vehicle_gps_producer.py (run_coupled).</p></li>
+<li><p>2026-04-20: Phase 4 NYC→Casa synthesis complete — 500k Casa trip
+requests over 90 days (2026-04-21 to 2026-07-19) from NYC TLC Q1 2023
+fingerprint. 8/8 validation checks pass: fleet 70.6% Petit / 29.4%
+Grand, A/E per-capita ratio 3.65×, morning+evening peaks [8,18,19],
+same-zone ≤19.9%, Petit median 12.6 MAD, Grand median 25.0 MAD.
+Artifacts in data/casa_synthesis/: casa_trip_requests.parquet (15.9 MB),
+casa_hourly_demand.parquet (0.63 MB), casa_od_matrix.parquet (0.01 MB),
+nyc_to_casa_zone_bridge.csv (1020 rows), eda_figures.png. Notebook:
+04_nyc_to_casa_synthesis.ipynb.</p></li>
+<li><p>2026-04-19: Week 6 ML Pipeline complete — Feature engineering
+(183,981 rows), GBT model (RMSE 3.71, R² 0.75, 45.8% improvement),
+FastAPI API with JWT auth. Model saved to
+s3a://mldata/models/demand_v1/. Docker: added taasim-api service + numpy
+persistence. Evidence: 10_week6_ml_pipeline.md.</p></li>
+<li><p>2026-04-19: Week 5 Spark ETL complete — Porto ETL (43 MiB, 12
+partitions), NYC ETL (4.3 MiB, 192K demand rows), KPI Analytics (6
+datasets). All outputs verified in MinIO curated/. Docker RAM upgraded
+(worker 4g, master 3g limit). Evidence doc:
+09_week5_spark_etl.md.</p></li>
+<li><p>2026-04-17: Week 3 complete — All 3 Flink jobs deployed and
+running. TaskManagers scaled to 3 (12 slots). GPS Normalizer + Demand
+Aggregator + Trip Matcher operational. Kafka UI added. Data flow
+verified end-to-end. Created verification evidence doc
+(08_week3_completion.md).</p></li>
+<li><p>2026-04-17: Flink Job 2 (Demand Aggregator) deployed:
+processes.gps + raw.trips → 30s tumbling windows → demand_zones
+Cassandra + processed.demand topic.</p></li>
+<li><p>2026-04-17: Flink Job 3 (Trip Matcher) deployed: raw.trips +
+processed.gps → nearest vehicle matching → trips Cassandra +
+processed.matches topic.</p></li>
+<li><p>2026-04-12: Week 3 Sprint 3 completed — all 4 deliverables
+done.</p></li>
+<li><p>2026-04-12: Custom Flink Docker image built (PyFlink 1.18.1 +
+cassandra-driver + kafka-python).</p></li>
+<li><p>2026-04-12: Flink Job 1 GPS Normalizer deployed and running (2/2
+tasks, job f1100660).</p></li>
+<li><p>2026-04-12: Centroid anonymization verified — raw GPS snapped to
+zone centroids in Cassandra.</p></li>
+<li><p>2026-04-12: Flink checkpointing to MinIO verified — 10+
+checkpoints in s3://curated/flink-checkpoints/.</p></li>
+<li><p>2026-04-12: Late event watermark test created
+(scripts/test_late_events.py).</p></li>
+<li><p>2026-04-12: Grafana vehicle tracking dashboard deployed (Geomap +
+zone bar chart + table).</p></li>
+<li><p>2026-04-12: Week 2 Sprint 2 completed — all 3 deliverables
+done.</p></li>
+<li><p>2026-04-12: Kafka Connect S3 Sink deployed and verified (raw.gps
++ raw.trips → kafka-archive/).</p></li>
+<li><p>2026-04-12: Cassandra schema INSERT + SELECT tested on all 3
+tables.</p></li>
+<li><p>2026-04-12: ADR v1 created (documents/07_adr_v1.md) — Kappa,
+partition keys, MinIO, retention.</p></li>
+<li><p>2026-04-12: Updated copilot-instructions.md with Week 2 progress
+(12 containers, S3 Sink configs, ADR).</p></li>
+<li><p>2026-04-03: Rewrote copilot-instructions.md with full 11-section
+architecture reference (343 lines).</p></li>
+<li><p>2026-04-03: Full infrastructure verification passed — all 11
+containers healthy (Kafka, MinIO, Cassandra, Flink, Spark, Grafana,
+Jupyter).</p></li>
+<li><p>2026-04-03: Added change tracking guidelines to
+copilot-instructions.md.</p></li>
+<li><p>2026-04-03: Added full status documentation package under
+documents/.</p></li>
+<li><p>2026-04-03: Completed v3 geographic remapping and validated
+notebook outputs.</p></li>
+<li><p>2026-04-03: Identified Docker daemon runtime blocker for producer
+smoke test.</p></li>
+</ul>
+</body>
+</html>

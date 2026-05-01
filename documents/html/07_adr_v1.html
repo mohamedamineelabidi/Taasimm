@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>07_adr_v1</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#architecture-decision-record-taasim-v1"
+id="toc-architecture-decision-record-taasim-v1">Architecture Decision
+Record — TaaSim v1</a>
+<ul>
+<li><a href="#kappa-architecture-over-lambda"
+id="toc-kappa-architecture-over-lambda">1. Kappa Architecture (over
+Lambda)</a></li>
+<li><a href="#cassandra-partition-key-choices"
+id="toc-cassandra-partition-key-choices">2. Cassandra Partition Key
+Choices</a></li>
+<li><a href="#minio-bucket-structure" id="toc-minio-bucket-structure">3.
+MinIO Bucket Structure</a></li>
+<li><a href="#kafka-topic-retention" id="toc-kafka-topic-retention">4.
+Kafka Topic Retention</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="architecture-decision-record-taasim-v1">Architecture Decision
+Record — TaaSim v1</h1>
+<p><strong>Date</strong>: 2025-04-12<br />
+<strong>Status</strong>: Accepted<br />
+<strong>Authors</strong>: TaaSim Team — ENSAH Capstone 2025–2026</p>
+<hr />
+<h2 id="kappa-architecture-over-lambda">1. Kappa Architecture (over
+Lambda)</h2>
+<p><strong>Decision</strong>: All real-time processing goes through
+Kafka → Flink. Spark is used exclusively for offline batch ETL and ML
+training — not for serving queries.</p>
+<p><strong>Context</strong>: TaaSim requires sub-5s trip matching and
+30s demand updates. Lambda would duplicate logic across batch and speed
+layers.</p>
+<p><strong>Rationale</strong>: - Kafka is the single source of truth
+(7-day retention, 4 partitions per topic) - Flink handles all three
+streaming jobs: GPS normalization, demand aggregation, trip matching -
+Spark runs offline only: historical ETL on Porto/NYC datasets and GBT
+model training - No dual-write or reconciliation complexity — one
+processing path per event - Kafka Connect S3 Sink archives raw events to
+MinIO for ML replay without affecting the live pipeline</p>
+<p><strong>Trade-off</strong>: We lose the ability to reprocess
+unbounded history in real-time. Acceptable because Kafka’s 7-day
+retention covers our replay needs, and Spark handles anything older via
+MinIO archives.</p>
+<hr />
+<h2 id="cassandra-partition-key-choices">2. Cassandra Partition Key
+Choices</h2>
+<p><strong>Decision</strong>: Partition keys are designed by API query
+pattern, not by entity normalization.</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 26%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th>Table</th>
+<th>Partition Key</th>
+<th>Query Pattern</th>
+<th>Justification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vehicle_positions</code></td>
+<td><code>(city, zone_id)</code></td>
+<td>“All vehicles in zone X”</td>
+<td>Grafana map + Flink trip matcher need zone-level lookups.
+Partitioning by <code>taxi_id</code> would scatter zone queries across
+all partitions.</td>
+</tr>
+<tr>
+<td><code>trips</code></td>
+<td><code>(city, date_bucket)</code></td>
+<td>“Trip history for a given day”</td>
+<td><code>date_bucket</code> (TEXT, e.g. ‘2025-04-12’) bounds partition
+growth. Without it, a single city partition grows unboundedly.</td>
+</tr>
+<tr>
+<td><code>demand_zones</code></td>
+<td><code>(city, zone_id)</code></td>
+<td>“Demand heatmap per zone”</td>
+<td>Each zone’s demand time-series is self-contained. Grafana queries
+one zone at a time for heatmap rendering.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Clustering keys</strong>: All tables use <code>DESC</code>
+ordering on timestamp columns so <code>LIMIT N</code> returns the most
+recent records without a full scan.</p>
+<p><strong>TTLs</strong>: <code>vehicle_positions</code> = 24h (stale
+GPS is useless), <code>demand_zones</code> = 7 days (weekly trend
+analysis), <code>trips</code> = no TTL (permanent record).</p>
+<hr />
+<h2 id="minio-bucket-structure">3. MinIO Bucket Structure</h2>
+<p><strong>Decision</strong>: Four top-level buckets organized by data
+lifecycle stage.</p>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 27%" />
+<col style="width: 24%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr>
+<th>Bucket</th>
+<th>Purpose</th>
+<th>Writer</th>
+<th>Reader</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>raw/</code></td>
+<td>Immutable source data (Porto CSV, NYC Parquet)</td>
+<td>Manual upload</td>
+<td>Spark ETL</td>
+</tr>
+<tr>
+<td><code>curated/</code></td>
+<td>Cleaned, geo-enriched Parquet + Flink checkpoints</td>
+<td>Spark ETL, Flink</td>
+<td>Spark ML, Flink</td>
+</tr>
+<tr>
+<td><code>ml/</code></td>
+<td>Feature matrices and trained models</td>
+<td>Spark ML</td>
+<td>FastAPI</td>
+</tr>
+<tr>
+<td><code>kafka-archive/</code></td>
+<td>Kafka Connect S3 Sink mirror of raw topics</td>
+<td>Kafka Connect</td>
+<td>Spark ETL</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rationale</strong>: Separating by lifecycle stage (raw →
+curated → ml) enables independent access control, retention policies,
+and clear data lineage. <code>kafka-archive/</code> bridges streaming
+and batch worlds — raw events are archived hourly in JSON format,
+partitioned by <code>year/month/day/hour</code> for efficient Spark
+reads.</p>
+<hr />
+<h2 id="kafka-topic-retention">4. Kafka Topic Retention</h2>
+<p><strong>Decision</strong>: 7-day retention (168 hours) on all topics.
+No compaction.</p>
+<p><strong>Rationale</strong>: - 7 days covers a full business week for
+replay/debugging - Kafka Connect S3 Sink provides permanent archival to
+MinIO — no data loss after retention expiry - No log compaction because
+GPS and trip events are immutable time-series, not key-value state - 4
+partitions per topic: sufficient for 1-broker dev setup while allowing
+parallel Flink consumption</p>
+<p><strong>Risk</strong>: If Kafka Connect is down for &gt;7 days,
+events are lost. Mitigation: Grafana alert on connector status + MinIO
+archive verification script.</p>
+</body>
+</html>

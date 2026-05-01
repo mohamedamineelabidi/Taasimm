@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>04_task_zone_remapping_v3</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="documents\report-style.css" />
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#task-4---zone-remapping-porto---casablanca-v3"
+id="toc-task-4---zone-remapping-porto---casablanca-v3">Task 4 - Zone
+Remapping Porto -&gt; Casablanca (v3)</a>
+<ul>
+<li><a href="#objective" id="toc-objective">Objective</a></li>
+<li><a href="#problem-found-in-earlier-version"
+id="toc-problem-found-in-earlier-version">Problem Found in Earlier
+Version</a></li>
+<li><a href="#v3-redesign-delivered" id="toc-v3-redesign-delivered">v3
+Redesign Delivered</a></li>
+<li><a href="#files-updated" id="toc-files-updated">Files
+Updated</a></li>
+<li><a href="#validation-metrics-from-executed-notebook"
+id="toc-validation-metrics-from-executed-notebook">Validation Metrics
+(from executed notebook)</a></li>
+<li><a href="#result" id="toc-result">Result</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="task-4---zone-remapping-porto---casablanca-v3">Task 4 - Zone
+Remapping Porto -&gt; Casablanca (v3)</h1>
+<p>Status: Completed (major quality improvement) Last updated:
+2026-04-03</p>
+<h2 id="objective">Objective</h2>
+<p>Remap Porto GPS trips into Casablanca geography with realistic zone
+assignment.</p>
+<h2 id="problem-found-in-earlier-version">Problem Found in Earlier
+Version</h2>
+<ul>
+<li>Uniform 4x4 mapping was mathematically valid but geographically
+illogical.</li>
+<li>Arrondissements were not placed according to real Casablanca
+structure.</li>
+</ul>
+<h2 id="v3-redesign-delivered">v3 Redesign Delivered</h2>
+<ul>
+<li>Replaced uniform mapping with irregular, geography-aligned
+tessellation (16 zones)</li>
+<li>Added adjacency metadata for downstream matching logic</li>
+<li>Shifted Porto latitude transform range to center density in
+Casablanca urban core:
+<ul>
+<li>old: 41.140 to 41.185</li>
+<li>new: 41.085 to 41.195</li>
+</ul></li>
+</ul>
+<h2 id="files-updated">Files Updated</h2>
+<ul>
+<li>data/zone_mapping.csv</li>
+<li>producers/config.py</li>
+<li>notebooks/02_zone_remapping.ipynb (rebuilt and executed)</li>
+<li>data/zone_centroids.csv</li>
+<li>data/remapped_trips_sample.csv</li>
+<li>notebooks/casablanca_zone_map.html</li>
+</ul>
+<h2 id="validation-metrics-from-executed-notebook">Validation Metrics
+(from executed notebook)</h2>
+<ul>
+<li>Origins inside zones: 47,325 / 47,516 (99.6%)</li>
+<li>Destinations inside zones: 45,549 / 47,516 (95.9%)</li>
+<li>Edge clamping rate: 0.85%</li>
+<li>Bounding-box validation: PASS</li>
+</ul>
+<h2 id="result">Result</h2>
+<ul>
+<li>Remapping is now both technically valid and geographically coherent
+for Casablanca.</li>
+</ul>
+</body>
+</html>
