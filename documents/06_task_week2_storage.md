@@ -13,6 +13,10 @@ Configure persistent storage for the streaming pipeline:
 - Cassandra keyspace `taasim` with 3 tables deployed and justified
 - Written Architecture Decision Record (ADR-001)
 
+> Historical note: this Week 2 file is evidence-oriented. Current canonical
+> connector wiring uses split configs (`connect-s3-sink-gps.json`,
+> `connect-s3-sink-trips.json`) registered via `scripts/register-connectors.ps1`.
+
 ---
 
 ## Deliverables
@@ -39,17 +43,19 @@ docker exec taasim-minio mc ls local/
 **Port:** `localhost:8083`  
 **Plugin:** `confluentinc/kafka-connect-s3:10.5.16` (installed on first start)
 
-**Connector config:** `config/kafka-connect/s3-sink-connector.json`
+**Connector configs:**
+- `config/connect-s3-sink-gps.json`
+- `config/connect-s3-sink-trips.json`
 
 Topics mirrored:
 - `raw.gps` → `s3://kafka-archive/raw/raw.gps/year=YYYY/month=MM/day=dd/hour=HH/`
 - `raw.trips` → `s3://kafka-archive/raw/raw.trips/year=YYYY/month=MM/day=dd/hour=HH/`
 
-Auto-registered by `taasim-connect-init` container after Connect becomes healthy.
+Connectors are registered manually after Connect is healthy.
 
 **Manual re-registration (Windows):**
 ```powershell
-.\scripts\register-s3-sink.ps1
+.\scripts\register-connectors.ps1
 ```
 **Manual re-registration (Linux/Mac):**
 ```bash
@@ -58,8 +64,10 @@ bash scripts/register-s3-sink.sh
 
 **Verification:**
 ```bash
-# Check connector status
-curl -s http://localhost:8083/connectors/taasim-s3-sink/status | python -m json.tool
+# Check connector list and statuses
+curl -s http://localhost:8083/connectors | python -m json.tool
+curl -s http://localhost:8083/connectors/s3-sink-raw-gps/status | python -m json.tool
+curl -s http://localhost:8083/connectors/s3-sink-raw-trips/status | python -m json.tool
 
 # List archived files in MinIO
 docker exec taasim-minio mc ls -r local/kafka-archive/
@@ -102,13 +110,14 @@ ADR-001 covers:
 
 | File | Description |
 |------|-----------|
-| `config/kafka-connect/s3-sink-connector.json` | S3 Sink connector registration payload |
-| `scripts/register-s3-sink.ps1` | PowerShell manual re-registration helper |
-| `scripts/register-s3-sink.sh` | Bash manual re-registration helper |
+| `config/connect-s3-sink-gps.json` | S3 Sink connector payload for `raw.gps` |
+| `config/connect-s3-sink-trips.json` | S3 Sink connector payload for `raw.trips` |
+| `scripts/register-connectors.ps1` | PowerShell split-connector registration helper |
+| `scripts/register-s3-sink.sh` | Bash single-script registration helper |
 | `documents/07_adr_storage.md` | ADR-001 — Storage Architecture |
 
 ## Modified Files
 
 | File | Change |
 |------|--------|
-| `docker-compose.yml` | Added `kafka-connect` (port 8083) and `connect-init` services (stack now 13 containers) |
+| `docker-compose.yml` | Added `kafka-connect` (port 8083); current stack registers connectors via script (no `connect-init` service) |

@@ -9,6 +9,152 @@
     /* Default styles provided by pandoc.
     ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
     */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
     span.smallcaps{font-variant: small-caps;}
     div.columns{display: flex; gap: min(4vw, 1.5em);}
     div.column{flex: auto; overflow-x: auto;}
@@ -89,7 +235,6 @@
     code span.vs { color: #4070a0; } /* VerbatimString */
     code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
   </style>
-  <link rel="stylesheet" href="documents\report-style.css" />
 </head>
 <body>
 <h1 id="taasim-end-to-end-deep-architectural-analysis">TaaSim —
@@ -136,7 +281,8 @@ Flink is the <strong>only</strong> real-time processor. Spark is
 <strong>offline only</strong> (ETL + ML training). This contract is
 enforced: NYC data never enters Kafka; only synthesised Casa events
 do.</p>
-<h3 id="the-12-container-stack">1.2 The 12-container stack</h3>
+<h3 id="the-compose-stack-container-count-varies-by-profile">1.2 The
+compose stack (container count varies by profile)</h3>
 <pre><code>┌───────────────────────────────────────────────────────────────────────────┐
 │ OFFLINE (one-time / batch)                                                │
 │  Notebooks ──► data/casa_synthesis/*.parquet  (500k synthetic Casa trips) │
@@ -204,11 +350,11 @@ async to Cassandra <code>vehicle_positions</code>, and forwards to
 <code>processed.demand</code>.</li>
 <li><strong>Flink Job 3</strong> maintains
 <code>MapState&lt;zone_id, Map&lt;taxi_id, position&gt;&gt;</code> (TTL
-60s). On each trip request it scores vehicles in the origin zone by
-<code>0.7·distance_km + 0.3·idle_penalty</code>, falls back to
-<code>adjacent_zones</code> after 5s, removes matched vehicle from state
-(prevents double-booking), computes <code>eta_seconds</code> and fare,
-writes <code>trips</code> and forwards to
+60s). Trip requests are fanned out immediately to origin + adjacent
+zones, each zone scores local vehicles via
+<code>0.7·distance_km + 0.3·idle_penalty</code>, the first successful
+match wins through dedup, then the job computes <code>eta_seconds</code>
+and fare, writes <code>trips</code>, and forwards to
 <code>processed.matches</code>.</li>
 <li><strong>Grafana</strong> queries Cassandra every ~5s (Geomap panel
 on <code>vehicle_positions</code>, bar/heatmap on
@@ -471,13 +617,10 @@ Casa lat/lon + zone_id space.</li>
 <h3 id="matching-flow">4.3 Matching flow</h3>
 <pre><code>on trip_request(trip_id, origin_zone):
     if trip_id in matched_set: return                   # idempotency
-    candidates = state[origin_zone]
+    fanout event to origin_zone + adjacent_zones[origin_zone]
+    candidates = state[current_zone]
     if not candidates:
-        wait up to 5s (via timer)
-        candidates = union(state[z] for z in adjacent_zones[origin_zone])
-    if not candidates:
-        emit {status: &quot;no_vehicle&quot;} → processed.matches
-        write trips(status=&quot;no_vehicle&quot;) → Cassandra
+        emit local no_vehicle attempt
         return
     best = argmin(cost(v) for v in candidates)
     state[best.zone].remove(best.taxi_id)               # release lock
@@ -537,7 +680,7 @@ Job-by-Job</h2>
 <td><strong>Window</strong></td>
 <td>none (per-event)</td>
 <td><code>Tumbling(30s)</code> event-time</td>
-<td>none + 5s processing-time timer</td>
+<td>none (event-driven keyed process)</td>
 </tr>
 <tr>
 <td><strong>Transforms</strong></td>
@@ -779,9 +922,11 @@ fingerprint</td>
 <ul>
 <li><strong><code>api/main.py</code></strong> — FastAPI + JWT (HS256,
 24h, <code>rider</code>/<code>admin</code> roles). Endpoints:
-<code>POST /api/demand/forecast</code> (loads GBT at startup,
-&lt;500ms), <code>GET /api/vehicles/{zone_id}</code>,
-<code>POST /api/trips</code>, <code>GET /api/health</code>.</li>
+<code>POST /api/demand/forecast</code> (heuristic by default; optional
+PySpark model path when enabled),
+<code>GET /api/vehicles/{zone_id}</code> (degraded empty response if
+Cassandra unavailable), <code>POST /api/trips</code> (publishes to Kafka
+<code>raw.trips</code>), <code>GET /api/health</code>.</li>
 </ul>
 <hr />
 <h2 id="storage-layer">8. 🗄️ Storage Layer</h2>

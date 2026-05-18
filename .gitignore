@@ -42,3 +42,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Local environment overrides
+.env

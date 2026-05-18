@@ -141,7 +141,19 @@ cd Taasimm
 chmod +x download-jars.sh && ./download-jars.sh
 ```
 
-### 3. Start the Platform
+### 3. Configure Demo Environment
+
+```bash
+# Windows PowerShell
+Copy-Item .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+```
+
+Defaults in `.env.example` are demo-only credentials. Replace all values for non-demo usage.
+
+### 4. Start the Platform
 
 ```bash
 docker compose up -d
@@ -168,7 +180,7 @@ taasim-trip-producer    Running
 taasim-api              Running         ← FastAPI (Week 6)
 ```
 
-### 4. Upload Datasets to MinIO
+### 5. Upload Datasets to MinIO
 
 ```powershell
 .\upload-datasets.ps1
@@ -179,9 +191,16 @@ taasim-api              Running         ← FastAPI (Week 6)
 | Porto Taxi Trajectories | [Kaggle](https://www.kaggle.com/c/pkdd-15-predict-taxi-service-trajectory-i) | 1.8 GiB |
 | NYC TLC Trip Records (3 months) | [NYC Open Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) | ~150 MiB |
 
-### 5. Producers (Already Running in Docker)
+### 6. Producers (Already Running in Docker)
 
-The Phase-4 producers (`taasim-gps-producer`, `taasim-trip-producer`) start automatically with the stack in **COUPLED mode** — replaying the 500k Casa synthetic trip requests paired with 500 OSRM-routed polylines, fleet=2000, speed=50× wall-clock.
+The Phase-4 producers (`taasim-gps-producer`, `taasim-trip-producer`) start automatically with the stack in **COUPLED mode** — replaying the 500k Casa synthetic trip requests paired with 500 OSRM-routed polylines.
+
+Current compose defaults are tuned for stable local demos:
+
+- GPS producer: `--speed ${GPS_PRODUCER_SPEED:-8}` and `--fleet-size ${GPS_FLEET_SIZE:-600}`
+- Trip producer: `--speed ${TRIP_PRODUCER_SPEED:-12}`
+
+You can override these in `.env` when load-testing.
 
 To run a local smoke test against `localhost:9092` (5 trips, ~30 GPS pings):
 
@@ -190,7 +209,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1                 # Windows
 # source .venv/bin/activate                    # Linux/Mac
 
-pip install -r producers/requirements.txt 2>$null; pip install kafka-python h3 pandas pyarrow numpy
+pip install kafka-python h3 pandas pyarrow numpy scipy
 
 python producers/vehicle_gps_producer.py --mode coupled --max-trips 5
 python producers/trip_request_producer.py --source casa_synth --max-trips 5
@@ -202,7 +221,7 @@ After editing producer source, rebuild the containers:
 docker compose up -d --build --force-recreate gps-producer trip-producer
 ```
 
-### 6. Access Services
+### 7. Access Services
 
 | Service | URL | Credentials |
 |:--------|:----|:------------|
@@ -215,13 +234,26 @@ docker compose up -d --build --force-recreate gps-producer trip-producer
 | FastAPI (Swagger) | http://localhost:8000/docs | JWT (see [§Machine Learning](#machine-learning)) |
 | Jupyter Lab | http://localhost:8888 | token from `docker logs taasim-jupyter` |
 
-### 7. Submit Flink Jobs and Verify
+### Security Notes (Demo vs Production)
+
+- Demo mode uses weak defaults from `.env.example` (`minioadmin`, `admin`, sample JWT secret) to keep local startup friction low.
+- For production-like environments, rotate `JWT_SECRET`, MinIO root creds, Kafka Connect AWS creds, and Grafana admin password before first boot.
+- Cassandra auth is currently disabled in this demo stack; enable authentication and network restrictions before external exposure.
+- API CORS/auth behavior is designed for local demo only and is not production-hardened.
+
+### 8. Submit Flink Jobs and Verify
 
 ```powershell
 .\scripts\register-connectors.ps1     # Register Kafka Connect S3 Sinks
 .\scripts\ensure-cassandra-schema.ps1  # Idempotent schema migration
 .\scripts\submit-flink-jobs.ps1        # Submit all 3 PyFlink jobs
 .\scripts\verify-flink-jobs.ps1        # End-to-end pipeline check
+
+# Optional verifier lag overrides (if host capacity differs)
+$env:MAX_LAG_RAW_GPS=2500
+$env:MAX_LAG_PROCESSED_GPS_DEMAND=3000
+$env:MAX_LAG_PROCESSED_GPS_MATCHER=3000
+$env:MAX_LAG_RAW_TRIPS=500
 ```
 
 ---
@@ -344,7 +376,7 @@ Two modes selected via `--source`:
 |:----:|:--------------------------|:------------|
 | 1 | Read row from `casa_trip_requests.parquet` (NYC temporal fingerprint, 500k rows) | Uniform random origin + destination zone |
 | 2 | Rebase `event_time` to wall-clock now | No parquet needed |
-| 3 | Emit at scaled rate (`--speed 50` → 1 hour real = 50 hours simulated) | Same emit loop |
+| 3 | Emit at scaled rate (`--speed 12` by default in compose; configurable) | Same emit loop |
 | 4 | Fleet split: haversine < 2 km → 70% petit / 30% grand taxi | Same fleet split |
 | 5 | Tariff: 7 + 1.6 MAD/km (petit) or fixed 10–40 MAD (grand), build JSON → `raw.trips` (key=`origin_zone`) | Same payload |
 
@@ -360,12 +392,12 @@ Two modes selected via `--source`:
 #### Docker build (`producers/Dockerfile`)
 
 ```
-python:3.11-slim → kafka-python, h3, pandas, pyarrow → COPY config.py + scripts
+python:3.13-slim → kafka-python, h3, pandas, pyarrow → COPY config.py + scripts
                 → MOUNT /data/*.parquet, /data/*.json (read-only)
-                → CMD python vehicle_gps_producer.py --speed 50 --fleet-size 2000
+                → CMD python vehicle_gps_producer.py --mode coupled --speed ${GPS_PRODUCER_SPEED:-8} --fleet-size ${GPS_FLEET_SIZE:-600}
 ```
 
-Compose passes `--mode coupled --speed 50 --fleet-size 2000` to GPS and `--source casa_synth --speed 50` to Trips. After editing producer source, rebuild with:
+Compose passes `--mode coupled --speed ${GPS_PRODUCER_SPEED:-8} --fleet-size ${GPS_FLEET_SIZE:-600}` to GPS and `--source casa_synth --speed ${TRIP_PRODUCER_SPEED:-12}` to Trips. After editing producer source, rebuild with:
 
 ```powershell
 docker compose up -d --build --force-recreate gps-producer trip-producer
@@ -404,6 +436,13 @@ trip_request_producer --> raw.trips --> Job 2 --> processed.demand --> demand_zo
                               +--> Job 3 --> processed.matches --> trips
 ```
 
+Current compose defaults are tuned for stable local demos:
+
+- GPS producer: `--speed ${GPS_PRODUCER_SPEED:-8}` and `--fleet-size ${GPS_FLEET_SIZE:-600}`
+- Trip producer: `--speed ${TRIP_PRODUCER_SPEED:-12}`
+
+You can override these in `.env` when load-testing.
+
 ### Cassandra Schema
 
 | Table | Partition Key | Clustering | TTL | Query Pattern |
@@ -439,28 +478,26 @@ trip_request_producer --> raw.trips --> Job 2 --> processed.demand --> demand_zo
 
 ### Serving — FastAPI ([api/main.py](api/main.py))
 
-Four endpoints, JWT-protected (`HS256`, 24h expiry, two roles: `rider` + `admin`):
+Seven endpoints, JWT-protected (`HS256`, 24h expiry, two roles: `rider` + `admin`):
 
 | Method | Path | Role | Purpose |
 |:------|:-----|:-----|:--------|
 | `POST` | `/api/auth/token`      | public | Issue JWT (demo creds — username + role) |
 | `POST` | `/api/demand/forecast` | rider/admin | Demand prediction for `(zone_id, datetime)` — heuristic by default; GBT when `PYSPARK_ENABLED=1` (see `api/main.py`) |
-| `POST` | `/api/trips`           | rider/admin | **Stub** — returns a matched-trip JSON. Does NOT yet publish to `raw.trips`; trip ingestion goes through the trip-request producer. |
-| `GET`  | `/api/zones`           | public | List all 16 Casablanca zones (from `data/zone_mapping_v4.csv`) |
-| `GET`  | `/api/zones/{zone_id}` | public | Zone detail |
+| `POST` | `/api/trips`           | rider/admin | Publish a trip request to Kafka `raw.trips` (for Flink Job 3 matching), return queued acknowledgment |
+| `GET`  | `/api/zones`           | rider/admin | List all 16 Casablanca zones (from `data/zone_mapping_v4.csv`) |
+| `GET`  | `/api/zones/{zone_id}` | rider/admin | Zone detail |
+| `GET`  | `/api/vehicles/{zone_id}` | rider/admin | Latest vehicle positions for one zone (read from Cassandra `vehicle_positions`); returns degraded empty payload if Cassandra is unavailable |
 | `GET`  | `/api/health`          | public | Liveness + `model_loaded` (true only when `PYSPARK_ENABLED=1` and the GBT pipeline loaded) |
 
-> Planned but not yet implemented: `GET /api/vehicles/{zone}` — live vehicle
-> snapshot from Cassandra `vehicle_positions`. Tracked for a future sprint.
-
 ```bash
-curl -X POST http://localhost:8000/api/demand/forecast \
-  -H "Authorization: Bearer $JWT" \
+TOKEN="<paste JWT from /api/auth/token response>"
+
+curl -s -X POST http://localhost:8000/api/demand/forecast \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"zone_id": 8, "datetime": "2026-04-04T08:30:00"}'
-# →
-# { "zone_id": 8, "zone_name": "Maarif",
-#   "predicted_demand": 142, "slot_start": "2026-04-04T08:30:00" }
+# -> {"zone_id":8,"zone_name":"Maarif",...}
 ```
 
 ---
@@ -500,7 +537,7 @@ Taasimm/
 │   └── verify_model.py
 │
 ├── api/                            # FastAPI REST (Week 6)
-│   ├── main.py                     # JWT auth, 4 endpoints
+│   ├── main.py                     # JWT auth, forecast + zones + vehicles + trips
 │   ├── Dockerfile
 │   └── requirements.txt
 │
@@ -592,7 +629,7 @@ Taasimm/
 ### Production Readiness Checklist
 
 1. GPS events flow end-to-end: Kafka → Flink → Cassandra → Grafana vehicle map (updating live)
-2. Trip reservation: trip-request producer publishes to `raw.trips` → Flink Job 3 matches in under 5 seconds (`POST /api/trips` is a demo stub today)
+2. Trip reservation: `POST /api/trips` publishes to `raw.trips` → Flink Job 3 matches and writes assignment outcome to Cassandra
 3. Demand heatmap: Grafana updating every 30 seconds per zone
 4. ML forecast: API responds in under 500ms, beats naive baseline
 5. Checkpoint recovery: Flink TaskManager restart → job resumes from checkpoint

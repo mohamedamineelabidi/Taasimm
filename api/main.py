@@ -4,8 +4,8 @@ TaaSim — FastAPI: Demand Forecast & Trip Reservation API
 REST API serving:
   - POST /api/auth/token       → issue a JWT (demo creds; not a real login flow)
   - POST /api/demand/forecast  → predicted demand for (zone_id, datetime)
-  - POST /api/trips            → demo trip-reservation stub (returns matched JSON;
-                                 does NOT yet publish to Kafka raw.trips)
+    - POST /api/trips            → enqueue trip request to Kafka `raw.trips`
+                                                                 for Flink Trip Matcher processing
   - GET  /api/zones            → list 16 Casablanca zones (loaded from CSV)
   - GET  /api/zones/{zone_id}  → zone detail
   - GET  /api/health           → health + model-loaded check
@@ -31,12 +31,14 @@ Usage:
 """
 
 import csv
+import json
 import os
 import logging
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 import jwt
@@ -55,6 +57,21 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 PYSPARK_ENABLED = os.getenv("PYSPARK_ENABLED", "0") == "1"
 MODEL_PATH = os.getenv("MODEL_PATH", "s3a://mldata/models/demand_v1/")
 model_pipeline = None  # populated by load_model startup hook when enabled
+
+CASSANDRA_CONTACT_POINTS = [
+    x.strip()
+    for x in os.getenv("CASSANDRA_CONTACT_POINTS", os.getenv("CASSANDRA_HOST", "cassandra")).split(",")
+    if x.strip()
+]
+CASSANDRA_PORT = int(os.getenv("CASSANDRA_PORT", "9042"))
+CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "taasim")
+
+_cassandra_cluster = None
+_cassandra_session = None
+
+KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
+TRIP_REQUEST_TOPIC = os.getenv("TRIP_REQUEST_TOPIC", "raw.trips")
+_kafka_producer = None
 
 # ── App ──────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -166,6 +183,8 @@ class TripResponse(BaseModel):
     dest_zone: int
     origin_name: str
     dest_name: str
+    event_time: Optional[str] = None
+    ingestion_topic: Optional[str] = None
     estimated_eta_sec: Optional[int] = None
 
 
@@ -185,6 +204,26 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     zones: int
     version: str
+
+
+class VehiclePosition(BaseModel):
+    taxi_id: str
+    event_time: str
+    lat: float
+    lon: float
+    speed_kmh: float
+    status: str
+    h3_index: Optional[str] = None
+
+
+class ZoneVehiclesResponse(BaseModel):
+    city: str
+    zone_id: int
+    zone_name: str
+    count: int
+    vehicles: list[VehiclePosition]
+    degraded: bool = False
+    degraded_reason: Optional[str] = None
 
 
 # ── Auth helpers ─────────────────────────────────────────────────────
@@ -214,6 +253,63 @@ def require_admin(token: dict = Depends(verify_token)):
     if token.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return token
+
+
+def _get_cassandra_session():
+    """Lazily connect to Cassandra when a query endpoint needs it."""
+    global _cassandra_cluster, _cassandra_session
+    if _cassandra_session is not None:
+        return _cassandra_session
+
+    try:
+        from cassandra.cluster import Cluster  # type: ignore
+    except Exception as e:
+        log.warning("Cassandra driver unavailable in API image: %s", e)
+        return None
+
+    try:
+        _cassandra_cluster = Cluster(CASSANDRA_CONTACT_POINTS, port=CASSANDRA_PORT)
+        _cassandra_session = _cassandra_cluster.connect(CASSANDRA_KEYSPACE)
+        log.info(
+            "Connected API to Cassandra %s:%s/%s",
+            ",".join(CASSANDRA_CONTACT_POINTS),
+            CASSANDRA_PORT,
+            CASSANDRA_KEYSPACE,
+        )
+        return _cassandra_session
+    except Exception as e:
+        log.warning("Could not connect API to Cassandra: %s", e)
+        _cassandra_cluster = None
+        _cassandra_session = None
+        return None
+
+
+def _get_kafka_producer():
+    """Lazily connect to Kafka when trip-ingestion endpoint is called."""
+    global _kafka_producer
+    if _kafka_producer is not None:
+        return _kafka_producer
+
+    try:
+        from kafka import KafkaProducer  # type: ignore
+    except Exception as e:
+        log.warning("Kafka producer library unavailable in API image: %s", e)
+        return None
+
+    try:
+        _kafka_producer = KafkaProducer(
+            bootstrap_servers=KAFKA_BOOTSTRAP,
+            key_serializer=lambda k: k.encode("utf-8"),
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            acks="all",
+            retries=3,
+        )
+        log.info("Connected API to Kafka at %s", KAFKA_BOOTSTRAP)
+        return _kafka_producer
+    except Exception as e:
+        log.warning("Could not connect API to Kafka: %s", e)
+        _kafka_producer = None
+        return None
 
 
 # ── Forecast logic ───────────────────────────────────────────────────
@@ -322,21 +418,116 @@ async def forecast_demand(req: ForecastRequest, token: dict = Depends(verify_tok
 
 @app.post("/api/trips", response_model=TripResponse)
 async def create_trip(req: TripRequest, token: dict = Depends(verify_token)):
-    """Create a trip reservation."""
+    """Publish a trip request to Kafka for Flink Trip Matcher processing."""
     if req.origin_zone not in ZONE_INFO or req.dest_zone not in ZONE_INFO:
         raise HTTPException(status_code=404, detail="Invalid zone ID")
 
-    import uuid
-    trip_id = str(uuid.uuid4())[:8]
+    producer = _get_kafka_producer()
+    if producer is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Kafka is unavailable in this API runtime",
+        )
+
+    event_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    trip_id = str(uuid.uuid4())
+    origin = ZONE_INFO[req.origin_zone]
+    dest = ZONE_INFO[req.dest_zone]
+
+    payload = {
+        "trip_id": trip_id,
+        "rider_id": req.rider_id,
+        "origin_zone": req.origin_zone,
+        "origin_lat": float(origin["lat"]),
+        "origin_lon": float(origin["lon"]),
+        "destination_zone": req.dest_zone,
+        "dest_lat": float(dest["lat"]),
+        "dest_lon": float(dest["lon"]),
+        "event_time": event_time,
+        "call_type": "B",
+        "source": "api_v1",
+    }
+
+    try:
+        future = producer.send(TRIP_REQUEST_TOPIC, key=req.rider_id, value=payload)
+        future.get(timeout=5)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Trip publish failed: {e}")
 
     return TripResponse(
         trip_id=trip_id,
-        status="matched",
+        status="queued",
         origin_zone=req.origin_zone,
         dest_zone=req.dest_zone,
-        origin_name=ZONE_INFO[req.origin_zone]["name"],
-        dest_name=ZONE_INFO[req.dest_zone]["name"],
-        estimated_eta_sec=180,
+        origin_name=origin["name"],
+        dest_name=dest["name"],
+        event_time=event_time,
+        ingestion_topic=TRIP_REQUEST_TOPIC,
+    )
+
+
+@app.get("/api/vehicles/{zone_id}", response_model=ZoneVehiclesResponse)
+async def get_zone_vehicles(
+    zone_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    token: dict = Depends(verify_token),
+):
+    """Return latest vehicle positions for a specific zone from Cassandra."""
+    if zone_id not in ZONE_INFO:
+        raise HTTPException(status_code=404, detail=f"Zone {zone_id} not found")
+
+    session = _get_cassandra_session()
+    if session is None:
+        return ZoneVehiclesResponse(
+            city="casablanca",
+            zone_id=zone_id,
+            zone_name=ZONE_INFO[zone_id]["name"],
+            count=0,
+            vehicles=[],
+            degraded=True,
+            degraded_reason="Cassandra is unavailable in this API runtime",
+        )
+
+    cql = (
+        "SELECT event_time, taxi_id, lat, lon, speed, status, h3_index "
+        "FROM vehicle_positions WHERE city=%s AND zone_id=%s "
+        f"LIMIT {int(limit)}"
+    )
+    try:
+        rows = session.execute(cql, ("casablanca", zone_id))
+    except Exception as e:
+        return ZoneVehiclesResponse(
+            city="casablanca",
+            zone_id=zone_id,
+            zone_name=ZONE_INFO[zone_id]["name"],
+            count=0,
+            vehicles=[],
+            degraded=True,
+            degraded_reason=f"Vehicle lookup failed: {e}",
+        )
+
+    vehicles = []
+    for row in rows:
+        event_time = row.event_time.isoformat() if getattr(row, "event_time", None) else ""
+        vehicles.append(
+            VehiclePosition(
+                taxi_id=str(getattr(row, "taxi_id", "")),
+                event_time=event_time,
+                lat=float(getattr(row, "lat", 0.0) or 0.0),
+                lon=float(getattr(row, "lon", 0.0) or 0.0),
+                speed_kmh=float(getattr(row, "speed", 0.0) or 0.0),
+                status=str(getattr(row, "status", "unknown") or "unknown"),
+                h3_index=getattr(row, "h3_index", None),
+            )
+        )
+
+    return ZoneVehiclesResponse(
+        city="casablanca",
+        zone_id=zone_id,
+        zone_name=ZONE_INFO[zone_id]["name"],
+        count=len(vehicles),
+        vehicles=vehicles,
+        degraded=False,
     )
 
 
@@ -391,3 +582,22 @@ async def load_model():
     except Exception as e:
         log.warning("Could not load ML model (using heuristic fallback): %s", e)
         model_pipeline = None
+
+
+@app.on_event("shutdown")
+async def close_connections():
+    global _cassandra_cluster, _cassandra_session, _kafka_producer
+    if _cassandra_cluster is not None:
+        try:
+            _cassandra_cluster.shutdown()
+        except Exception:
+            pass
+    if _kafka_producer is not None:
+        try:
+            _kafka_producer.flush(timeout=5)
+            _kafka_producer.close(timeout=5)
+        except Exception:
+            pass
+    _cassandra_cluster = None
+    _cassandra_session = None
+    _kafka_producer = None

@@ -27,7 +27,7 @@
 ### 1.1 Architectural style: **Kappa**
 Kafka is the **only** system of record for live data. Flink is the **only** real-time processor. Spark is **offline only** (ETL + ML training). This contract is enforced: NYC data never enters Kafka; only synthesised Casa events do.
 
-### 1.2 The 12-container stack
+### 1.2 The compose stack (container count varies by profile)
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -75,7 +75,7 @@ Kafka is the **only** system of record for live data. Flink is the **only** real
 3. **Kafka Connect** mirrors the raw event to `s3://kafka-archive/raw.gps/YYYY/MM/DD/HH/*.parquet` (replay capability).
 4. **Flink Job 1** consumes, extracts `event_time` for watermark (3-min bounded lateness), keys by `taxi_id`, deduplicates via `ValueState<last_ts>`, validates bounds + speed, looks up `h3_index → zone_id` in an in-memory broadcast map, snaps lat/lon to `(zone_centroid + hash-based jitter)`, writes async to Cassandra `vehicle_positions`, and forwards to `processed.gps`.
 5. **Flink Job 2** unions `processed.gps` + `raw.trips` on a `(city, zone_id)` key, opens a 30-second event-time tumbling window, counts **distinct** `taxi_id` and trip events, computes `ratio = requests / max(1, vehicles)`, writes `demand_zones` (TTL 7d) and forwards to `processed.demand`.
-6. **Flink Job 3** maintains `MapState<zone_id, Map<taxi_id, position>>` (TTL 60s). On each trip request it scores vehicles in the origin zone by `0.7·distance_km + 0.3·idle_penalty`, falls back to `adjacent_zones` after 5s, removes matched vehicle from state (prevents double-booking), computes `eta_seconds` and fare, writes `trips` and forwards to `processed.matches`.
+6. **Flink Job 3** maintains `MapState<zone_id, Map<taxi_id, position>>` (TTL 60s). Trip requests are fanned out immediately to origin + adjacent zones, each zone scores local vehicles via `0.7·distance_km + 0.3·idle_penalty`, the first successful match wins through dedup, then the job computes `eta_seconds` and fare, writes `trips`, and forwards to `processed.matches`.
 7. **Grafana** queries Cassandra every ~5s (Geomap panel on `vehicle_positions`, bar/heatmap on `demand_zones`) → user sees live taxi dots and zone heatmap.
 8. **FastAPI** serves `/api/demand/forecast` — GBT model loaded once from `s3a://mldata/models/demand_v1/` at startup; queries Cassandra for live features, returns prediction in <500ms.
 
@@ -198,13 +198,10 @@ Lower is better. Idle bonus encourages matching stationary vehicles (not ones mi
 ```
 on trip_request(trip_id, origin_zone):
     if trip_id in matched_set: return                   # idempotency
-    candidates = state[origin_zone]
+    fanout event to origin_zone + adjacent_zones[origin_zone]
+    candidates = state[current_zone]
     if not candidates:
-        wait up to 5s (via timer)
-        candidates = union(state[z] for z in adjacent_zones[origin_zone])
-    if not candidates:
-        emit {status: "no_vehicle"} → processed.matches
-        write trips(status="no_vehicle") → Cassandra
+        emit local no_vehicle attempt
         return
     best = argmin(cost(v) for v in candidates)
     state[best.zone].remove(best.taxi_id)               # release lock
@@ -226,7 +223,7 @@ on trip_request(trip_id, origin_zone):
 | **Watermark** | BoundedOutOfOrderness 3min | 10s + 15s idleness | 10s + 15s idleness |
 | **Key** | `taxi_id` | `(city, zone_id)` | `zone_id` |
 | **State** | `ValueState<last_ts>` TTL 5m | none (window-scoped) | `MapState<zone_id, vehicles>` TTL 60s |
-| **Window** | none (per-event) | `Tumbling(30s)` event-time | none + 5s processing-time timer |
+| **Window** | none (per-event) | `Tumbling(30s)` event-time | none (event-driven keyed process) |
 | **Transforms** | dedup → bounds/speed check → h3→zone → centroid+jitter snap | `COUNT(DISTINCT taxi_id)`, `COUNT(trips)`, ratio | nearest-neighbor score + adjacency fallback |
 | **Cassandra sink** | `vehicle_positions` (TTL 24h) | `demand_zones` (TTL 7d) | `trips` (no TTL) |
 | **Kafka sink** | `processed.gps` | `processed.demand` | `processed.matches` |
@@ -324,7 +321,7 @@ Live Kafka events come from **three offline artifacts**:
 | `04_nyc_to_casa_synthesis.ipynb` | **Current** — 500k Casa trip synthesis from NYC fingerprint |
 
 ### 7.6 API
-- **`api/main.py`** — FastAPI + JWT (HS256, 24h, `rider`/`admin` roles). Endpoints: `POST /api/demand/forecast` (loads GBT at startup, <500ms), `GET /api/vehicles/{zone_id}`, `POST /api/trips`, `GET /api/health`.
+- **`api/main.py`** — FastAPI + JWT (HS256, 24h, `rider`/`admin` roles). Endpoints: `POST /api/demand/forecast` (heuristic by default; optional PySpark model path when enabled), `GET /api/vehicles/{zone_id}` (degraded empty response if Cassandra unavailable), `POST /api/trips` (publishes to Kafka `raw.trips`), `GET /api/health`.
 
 ---
 

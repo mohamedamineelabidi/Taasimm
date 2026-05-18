@@ -39,13 +39,14 @@ Built the complete ML pipeline for demand forecasting:
 
 - **Endpoints**:
   - `POST /api/auth/token` — JWT token generation (admin/rider roles)
-  - `POST /api/demand/forecast` — demand prediction (zone_id + datetime)
-  - `POST /api/trips` — trip reservation
-  - `GET /api/zones` — list all 16 zones
-  - `GET /api/zones/{zone_id}` — zone details
+  - `POST /api/demand/forecast` — demand prediction (zone_id + datetime, heuristic by default)
+  - `POST /api/trips` — publishes trip request JSON to Kafka `raw.trips` for Flink matching
+  - `GET /api/zones` — list all 16 zones (JWT-protected)
+  - `GET /api/zones/{zone_id}` — zone details (JWT-protected)
+  - `GET /api/vehicles/{zone_id}` — latest zone vehicles from Cassandra; degraded empty payload on Cassandra outage
   - `GET /api/health` — health check
 - **Auth**: JWT HS256, 24h expiry, role-based access
-- **Fallback**: Heuristic demand curve if model not available
+- **Fallback**: Heuristic demand curve if PySpark model path is unavailable in API runtime
 - **Docker**: `taasim-api` container on port 8000
 
 ## Docker Changes

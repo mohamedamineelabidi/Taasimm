@@ -38,7 +38,7 @@ Your job is NOT to implement features. Your job is to:
 ### Flink Job Logic Contract
 - **Job 1 GPS Normalizer**: validate coords → deduplicate → event-time watermark (3-min lateness) → assign zone via H3 → snap to centroid → write Cassandra + processed.gps
 - **Job 2 Demand Aggregator**: 30s tumbling windows per (city, zone_id) → count unique vehicles + pending requests → supply/demand ratio → Cassandra demand_zones + processed.demand
-- **Job 3 Trip Matcher**: match trip to nearest vehicle in zone → 5s fallback to adjacent zones → write Cassandra trips + processed.matches
+- **Job 3 Trip Matcher**: immediate fanout to origin + adjacent zones, nearest available vehicle match with dedup winner → write Cassandra trips + processed.matches
 
 ### GPS/Zone Contract
 - Zone assigned via H3 O(1) lookup (h3_index field trusted from producer)

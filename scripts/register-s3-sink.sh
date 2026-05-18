@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================
-# register-s3-sink.sh
-# Manually register (or refresh) the TaaSim S3 Sink connector.
+# register-s3-sink.sh (legacy compatibility)
+# Registers the split S3 Sink connectors for raw.gps and raw.trips.
 # Run this from the project root after kafka-connect is healthy.
 # =============================================================
 
-set -e
+set -euo pipefail
 
 CONNECT_URL="${CONNECT_URL:-http://localhost:8083}"
-CONFIG_FILE="config/kafka-connect/s3-sink-connector.json"
-CONNECTOR_NAME="taasim-s3-sink"
+GPS_CONFIG="config/connect-s3-sink-gps.json"
+TRIPS_CONFIG="config/connect-s3-sink-trips.json"
 
-echo "=== TaaSim Kafka Connect — S3 Sink Registration ==="
+echo "=== TaaSim Kafka Connect — Split S3 Sink Registration ==="
 echo "Connect REST: $CONNECT_URL"
 
 # Wait until Connect is reachable
@@ -20,26 +20,32 @@ until curl -sf "$CONNECT_URL/connectors" > /dev/null; do
   sleep 5
 done
 
-# Delete existing connector if present (idempotent)
-if curl -sf "$CONNECT_URL/connectors/$CONNECTOR_NAME" > /dev/null 2>&1; then
-  echo "Deleting existing connector $CONNECTOR_NAME..."
-  curl -s -X DELETE "$CONNECT_URL/connectors/$CONNECTOR_NAME"
-  sleep 2
-fi
+register_or_update() {
+  local name="$1"
+  local config_path="$2"
 
-# Register connector
-echo "Registering connector from $CONFIG_FILE..."
-HTTP_STATUS=$(curl -s -o /tmp/connect-response.json \
-  -w "%{http_code}" \
-  -X POST "$CONNECT_URL/connectors" \
-  -H "Content-Type: application/json" \
-  -d @"$CONFIG_FILE")
+  echo "Registering connector: $name from $config_path"
+  if curl -sf "$CONNECT_URL/connectors/$name" > /dev/null 2>&1; then
+    curl -s -X PUT "$CONNECT_URL/connectors/$name/config" \
+      -H "Content-Type: application/json" \
+      -d "$(jq '.config' "$config_path")" > /tmp/connect-response.json
+  else
+    curl -s -X POST "$CONNECT_URL/connectors" \
+      -H "Content-Type: application/json" \
+      -d @"$config_path" > /tmp/connect-response.json
+  fi
+}
 
-if echo "$HTTP_STATUS" | grep -q "^2"; then
-  echo "=== Connector registered successfully (HTTP $HTTP_STATUS) ==="
-  curl -s "$CONNECT_URL/connectors/$CONNECTOR_NAME/status"
-else
-  echo "ERROR: Registration failed (HTTP $HTTP_STATUS)"
-  cat /tmp/connect-response.json
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required by this script. Install jq or use scripts/register-connectors.ps1 on Windows."
   exit 1
 fi
+
+register_or_update "s3-sink-raw-gps" "$GPS_CONFIG"
+register_or_update "s3-sink-raw-trips" "$TRIPS_CONFIG"
+
+echo "=== Connector status ==="
+curl -s "$CONNECT_URL/connectors/s3-sink-raw-gps/status"
+echo
+curl -s "$CONNECT_URL/connectors/s3-sink-raw-trips/status"
+echo

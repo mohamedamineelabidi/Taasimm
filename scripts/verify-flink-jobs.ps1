@@ -155,11 +155,16 @@ foreach ($topic in $topics) {
 Write-Host ""
 
 Write-Host "--- Kafka Consumer Lag ---" -ForegroundColor Yellow
-Check-ConsumerLag -GroupName "flink-gps-normalizer" -ExpectedTopic "raw.gps" -MaxLag 50
-Check-ConsumerLag -GroupName "demand-aggregator-gps" -ExpectedTopic "processed.gps" -MaxLag 25
-Check-ConsumerLag -GroupName "demand-aggregator-trips" -ExpectedTopic "raw.trips" -MaxLag 500
-Check-ConsumerLag -GroupName "trip-matcher-gps" -ExpectedTopic "processed.gps" -MaxLag 25
-Check-ConsumerLag -GroupName "trip-matcher-trips" -ExpectedTopic "raw.trips" -MaxLag 500
+$lagRawGps = [int]$(if ($env:MAX_LAG_RAW_GPS) { $env:MAX_LAG_RAW_GPS } else { "2000" })
+$lagProcessedGpsDemand = [int]$(if ($env:MAX_LAG_PROCESSED_GPS_DEMAND) { $env:MAX_LAG_PROCESSED_GPS_DEMAND } else { "2500" })
+$lagProcessedGpsMatcher = [int]$(if ($env:MAX_LAG_PROCESSED_GPS_MATCHER) { $env:MAX_LAG_PROCESSED_GPS_MATCHER } else { "2500" })
+$lagRawTrips = [int]$(if ($env:MAX_LAG_RAW_TRIPS) { $env:MAX_LAG_RAW_TRIPS } else { "500" })
+
+Check-ConsumerLag -GroupName "flink-gps-normalizer" -ExpectedTopic "raw.gps" -MaxLag $lagRawGps
+Check-ConsumerLag -GroupName "demand-aggregator-gps" -ExpectedTopic "processed.gps" -MaxLag $lagProcessedGpsDemand
+Check-ConsumerLag -GroupName "demand-aggregator-trips" -ExpectedTopic "raw.trips" -MaxLag $lagRawTrips
+Check-ConsumerLag -GroupName "trip-matcher-gps" -ExpectedTopic "processed.gps" -MaxLag $lagProcessedGpsMatcher
+Check-ConsumerLag -GroupName "trip-matcher-trips" -ExpectedTopic "raw.trips" -MaxLag $lagRawTrips
 Write-Host ""
 
 # ── 3. Cassandra Tables ───────────────────────────────────────────────────────

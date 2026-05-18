@@ -337,8 +337,8 @@ Each week delivers one working layer of the platform. By Week 5 the core end-to-
 **Engineering Tasks:**
 - Implement Flink Job 2 (Demand Aggregator): 30-second tumbling window per zone, write to `demand_zones` table.
 - Implement Flink Job 3 (Trip Matcher): on trip request event, match to nearest vehicle in zone, compute simple ETA, write match to `trips` table.
-- Implement 5-second fallback: if no vehicle in requested zone, expand to adjacent zones.
-- Verify end-to-end: reserve trip → match within 5 seconds → ETA returned by API stub.
+- Implement immediate adjacent-zone fanout with dedup: trip requests are evaluated across origin + adjacent zones in parallel.
+- Verify end-to-end: reserve trip → request is queued to Kafka `raw.trips` → Flink writes match result + ETA to Cassandra.
 
 **Deliverables:**
 - ✅ End-to-end trip flow: request → match → ETA < 5s
@@ -417,7 +417,7 @@ Evaluation is designed so that a team of 2 working consistently can achieve a go
 ✅ **The 5 things that must work on Demo Day:**
 
 1. GPS events flowing: Kafka → Flink Job 1 → Cassandra → Grafana vehicle position map (updating live).
-2. Trip reservation: `POST /api/trips` → Flink Job 3 match → trip record in Cassandra with ETA < 5 seconds.
+2. Trip reservation: `POST /api/trips` publishes to Kafka `raw.trips` → Flink Job 3 writes trip record in Cassandra with ETA.
 3. Demand heatmap: Flink Job 2 → Cassandra `demand_zones` → Grafana heatmap updating every 30 seconds.
 4. ML forecast: Spark-trained model → FastAPI `/demand/forecast` responding in < 500ms.
 5. Anomaly visible: `event_injector.py` demand spike → heatmap shows surge zone within 60 seconds.
