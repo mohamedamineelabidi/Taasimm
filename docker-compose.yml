@@ -408,26 +408,9 @@ services:
       retries: 15
       start_period: 180s
 
-  # Registers the S3 Sink connector once Kafka Connect is healthy
-  connect-init:
-    image: curlimages/curl:8.11.0
-    container_name: taasim-connect-init
-    depends_on:
-      kafka-connect:
-        condition: service_healthy
-    volumes:
-      - ./config/kafka-connect:/config
-    entrypoint: >
-      /bin/sh -c "
-      echo 'Registering TaaSim S3 Sink connector...' &&
-      curl -sf http://kafka-connect:8083/connectors/taasim-s3-sink > /dev/null
-        && echo 'Connector already exists, skipping registration.'
-        || curl -sf -X POST http://kafka-connect:8083/connectors -H 'Content-Type: application/json' -d @/config/s3-sink-connector.json &&
-      echo '=== Done ===' &&
-      curl -s http://kafka-connect:8083/connectors
-      "
-    networks:
-      - taasim-net
+  # NOTE: The split S3 Sink connectors (raw.gps + raw.trips) are registered
+  # manually via `scripts/register-connectors.ps1`. The previous auto-init
+  # service has been removed to avoid duplicate archival; see README §7.
 
   # ──────────────────────────────────────────────
   # 8. API — FastAPI demand forecast + trip reservation
@@ -445,6 +428,9 @@ services:
       MODEL_PATH: "s3a://mldata/models/demand_v1/"
       CASSANDRA_HOST: cassandra
       JWT_SECRET: "taasim-secret-key-change-in-production"
+      ZONE_MAPPING_CSV: "/data/zone_mapping_v4.csv"
+    volumes:
+      - ./data:/data:ro
     depends_on:
       minio:
         condition: service_healthy

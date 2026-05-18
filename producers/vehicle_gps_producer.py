@@ -427,9 +427,14 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
             lon += np.random.normal(0, NOISE_SIGMA)
 
             src_ts = base_src + k * ping_interval_s
-            wall_ts = src_to_wall(src_ts)
+            planned_wall_ts = src_to_wall(src_ts)
+            # event_time = planned wall-clock arrival time. When a blackout fires
+            # we delay producer scheduling (wall_ts) but keep event_time at the
+            # planned moment so the message is genuinely out-of-order/late from
+            # Flink's watermark perspective.
+            wall_ts = planned_wall_ts
             if has_blackout and k >= blackout_at:
-                wall_ts += blackout_delay_s / speed
+                wall_ts = planned_wall_ts + (blackout_delay_s / speed)
                 if k == blackout_at:
                     blackouts += 1
 
@@ -438,9 +443,7 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
             event = {
                 "taxi_id": taxi,
                 "trip_id": trip_id,
-                "event_time": datetime.fromtimestamp(src_ts + (k == 0) * 0, tz=timezone.utc).isoformat(),
-                # ^ event_time uses the *source* time (rebased by Flink if needed);
-                # wall_ts below drives producer scheduling only.
+                "event_time": datetime.fromtimestamp(planned_wall_ts, tz=timezone.utc).isoformat(),
                 "lat": round(lat, 6),
                 "lon": round(lon, 6),
                 "speed_kmh": 0.0,   # computed downstream if needed
@@ -450,8 +453,6 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
                 "snap_dist_m": 0.0,
                 "source": "coupled_v1",
             }
-            # Overwrite event_time with wall-clock so Flink watermarks advance now.
-            event["event_time"] = datetime.fromtimestamp(wall_ts, tz=timezone.utc).isoformat()
             heapq.heappush(heap, (wall_ts, counter, taxi, trip_id, event))
             counter += 1
         trips_expanded += 1
