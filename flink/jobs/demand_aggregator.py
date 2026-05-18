@@ -124,6 +124,10 @@ class DemandWindowFunction(ProcessWindowFunction):
                 pass
 
         unique_vehicles = len(vehicle_ids)
+        # ratio = demand / supply  (pending requests per active vehicle).
+        # ratio > 1 → zone is under-supplied; ratio < 1 → over-supplied.
+        # Cassandra column `ratio` stores this raw value; Grafana dashboards
+        # invert it when they need a supply/demand presentation.
         ratio = trip_count / max(1, unique_vehicles)
         window_start_dt = datetime.fromtimestamp(window_start_ms / 1000, tz=timezone.utc)
         # forecast_demand: placeholder until ML model deployed (Week 6)

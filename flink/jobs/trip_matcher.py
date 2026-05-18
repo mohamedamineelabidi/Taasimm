@@ -7,12 +7,21 @@ Inputs:
 
 Logic:
   1. Maintain a keyed state of available vehicles per zone (last GPS ping < 60s)
-  2. On trip request: find nearest available vehicle in origin_zone
-  3. If no vehicle in origin_zone within 5s: expand to adjacent zones (from zone_data.py)
-  4. Assign match → compute ETA (distance / avg_speed)
-  5. Emit to:
+  2. On trip request: fan the request out IMMEDIATELY to the origin zone plus all
+     adjacent zones (from zone_data.py). Each keyed instance attempts a local
+     match against its vehicle pool.
+  3. A shared `_matched_trips` set deduplicates so the first zone to bind a
+     vehicle wins; later zones drop the request.
+  4. If no vehicle is found in any zone the request is logged as unmatched.
+  5. Assign match → compute ETA (distance / avg_speed)
+  6. Emit to:
       → Cassandra: trips table
       → Kafka:     processed.matches topic
+
+Note: an earlier design called for a 5-second wait before falling back to
+adjacent zones. That timer-based approach was replaced by the immediate fan-out
++ dedup pattern above, which gives lower P95 match latency at the cost of a few
+extra short-lived match attempts per request.
 
 State TTL: vehicle positions expire after 60 seconds of inactivity.
 """

@@ -110,8 +110,8 @@ TaaSim follows a **Kappa Architecture** — Kafka is the system of record, Flink
 | Flink Job | Input | Processing | Output |
 |:----------|:------|:-----------|:-------|
 | **GPS Normalizer** | `raw.gps` | Validate, deduplicate, watermark (3-min lateness), zone mapping, centroid snap | `vehicle_positions` table + `processed.gps` |
-| **Demand Aggregator** | `processed.gps` + `raw.trips` | 30s tumbling window per zone, vehicle count + request count, supply/demand ratio | `demand_zones` table + `processed.demand` |
-| **Trip Matcher** | `raw.trips` + `processed.gps` | Find nearest vehicle in zone, 5s adjacent zone fallback, assign match, compute ETA | `trips` table + `processed.matches` |
+| **Demand Aggregator** | `processed.gps` + `raw.trips` | 30s tumbling window per zone, vehicle count + request count, demand/supply ratio (`requests/vehicles`, >1 = under-supplied) | `demand_zones` table + `processed.demand` |
+| **Trip Matcher** | `raw.trips` + `processed.gps` | Fan request out IMMEDIATELY to origin zone + adjacent zones, dedup via shared matched-trip set so first zone with a free vehicle wins; compute ETA | `trips` table + `processed.matches` |
 
 ---
 
@@ -443,11 +443,15 @@ Four endpoints, JWT-protected (`HS256`, 24h expiry, two roles: `rider` + `admin`
 
 | Method | Path | Role | Purpose |
 |:------|:-----|:-----|:--------|
-| `POST` | `/api/auth/login` | public | Issue JWT (demo creds) |
-| `POST` | `/api/demand/forecast` | rider/admin | GBT prediction for `(zone_id, datetime)` |
-| `GET`  | `/api/vehicles/{zone}` | rider/admin | Live vehicles in a zone (Cassandra) |
-| `POST` | `/api/trips`           | rider/admin | Submit trip reservation → `raw.trips` |
-| `GET`  | `/api/health`          | public | Liveness + model loaded check |
+| `POST` | `/api/auth/token`      | public | Issue JWT (demo creds — username + role) |
+| `POST` | `/api/demand/forecast` | rider/admin | Demand prediction for `(zone_id, datetime)` — heuristic by default; GBT when `PYSPARK_ENABLED=1` (see `api/main.py`) |
+| `POST` | `/api/trips`           | rider/admin | **Stub** — returns a matched-trip JSON. Does NOT yet publish to `raw.trips`; trip ingestion goes through the trip-request producer. |
+| `GET`  | `/api/zones`           | public | List all 16 Casablanca zones (from `data/zone_mapping_v4.csv`) |
+| `GET`  | `/api/zones/{zone_id}` | public | Zone detail |
+| `GET`  | `/api/health`          | public | Liveness + `model_loaded` (true only when `PYSPARK_ENABLED=1` and the GBT pipeline loaded) |
+
+> Planned but not yet implemented: `GET /api/vehicles/{zone}` — live vehicle
+> snapshot from Cassandra `vehicle_positions`. Tracked for a future sprint.
 
 ```bash
 curl -X POST http://localhost:8000/api/demand/forecast \
@@ -565,7 +569,7 @@ Taasimm/
 | 1 | Docker stack, datasets, EDA, zone remapping, Kafka producers | ✅ Done |
 | 2 | Kafka Connect S3 Sink, Cassandra ADR, storage design | ✅ Done |
 | 3 | Flink Job 1 (GPS normalizer), watermarks, Grafana vehicle map | ✅ Done |
-| 4 | Flink Job 2 (demand) + Job 3 (trip matcher), adjacent zone fallback | ✅ Done |
+| 4 | Flink Job 2 (demand) + Job 3 (trip matcher), immediate adjacent-zone fan-out with dedup | ✅ Done |
 | 5 | Spark ETL on Porto + NYC, KPI computation | ✅ Done |
 | 6 | ML feature engineering, GBT training, FastAPI forecast endpoint | ✅ Done — RMSE 3.71, R² 0.75 |
 | 7 | JWT hardening, GPS anonymization audit, integration testing, SLA, checkpoint recovery | 🟡 In progress |
@@ -588,7 +592,7 @@ Taasimm/
 ### Production Readiness Checklist
 
 1. GPS events flow end-to-end: Kafka → Flink → Cassandra → Grafana vehicle map (updating live)
-2. Trip reservation: `POST /api/trips` → match returned in under 5 seconds
+2. Trip reservation: trip-request producer publishes to `raw.trips` → Flink Job 3 matches in under 5 seconds (`POST /api/trips` is a demo stub today)
 3. Demand heatmap: Grafana updating every 30 seconds per zone
 4. ML forecast: API responds in under 500ms, beats naive baseline
 5. Checkpoint recovery: Flink TaskManager restart → job resumes from checkpoint

@@ -2,18 +2,35 @@
 TaaSim — FastAPI: Demand Forecast & Trip Reservation API
 =========================================================
 REST API serving:
-  - POST /api/demand/forecast  → predicted demand per zone+datetime
-  - GET  /api/vehicles/{zone}  → vehicles in zone (from Cassandra)
-  - POST /api/trips            → trip reservation
-  - GET  /api/health           → health check
+  - POST /api/auth/token       → issue a JWT (demo creds; not a real login flow)
+  - POST /api/demand/forecast  → predicted demand for (zone_id, datetime)
+  - POST /api/trips            → demo trip-reservation stub (returns matched JSON;
+                                 does NOT yet publish to Kafka raw.trips)
+  - GET  /api/zones            → list 16 Casablanca zones (loaded from CSV)
+  - GET  /api/zones/{zone_id}  → zone detail
+  - GET  /api/health           → health + model-loaded check
 
 JWT auth with two roles: rider (read + reserve), admin (full access).
-GBT model loaded from MinIO at startup.
+
+ML loading mode
+---------------
+The slim API image does NOT bundle PySpark. The demand forecast endpoint runs in
+**heuristic mode** by default: a baseline demand curve adjusted by weekday and
+zone popularity. This is deterministic, fast (<5 ms), and beats no-prediction.
+
+To enable the real GBT model loaded from `s3a://mldata/models/demand_v1/`:
+  1. Add `pyspark==3.5.4` and an S3A-capable Hadoop bundle to api/requirements.txt
+  2. Rebuild the image with a JDK base (current python:3.13-slim has no Java).
+  3. Set `PYSPARK_ENABLED=1` in the api service environment.
+
+Status of `model_loaded` is exposed via `/api/health` so dashboards can tell
+which mode is active.
 
 Usage:
-  uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+  uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+import csv
 import os
 import logging
 from datetime import datetime, timedelta
@@ -31,6 +48,13 @@ log = logging.getLogger("API")
 JWT_SECRET = os.getenv("JWT_SECRET", "taasim-secret-key-change-in-prod")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+# When 1, the demand endpoint will attempt to load a Spark PipelineModel and use
+# it for inference. Requires pyspark + Java in the runtime image (NOT included
+# in the default api/Dockerfile). When 0 (default) we use the deterministic
+# heuristic in predict_demand().
+PYSPARK_ENABLED = os.getenv("PYSPARK_ENABLED", "0") == "1"
+MODEL_PATH = os.getenv("MODEL_PATH", "s3a://mldata/models/demand_v1/")
+model_pipeline = None  # populated by load_model startup hook when enabled
 
 # ── App ──────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -41,11 +65,15 @@ app = FastAPI(
 
 security = HTTPBearer()
 
-# ── Zone centroids (from zone_mapping.csv) ───────────────────────────
-ZONE_INFO = {
+# ── Zone catalogue ───────────────────────────────────────────────────
+# Loaded from data/zone_mapping_v4.csv (mounted at /data in compose, or relative
+# in dev). Falls back to a hard-coded 16-zone dict if the CSV is missing so that
+# the API still responds in degraded environments.
+
+_ZONE_FALLBACK = {
     1:  {"name": "Ain Chock",      "lat": 33.5266, "lon": -7.6216},
-    2:  {"name": "Sidi Othmane",   "lat": 33.5550, "lon": -7.5625},
-    3:  {"name": "Sidi Moumen",    "lat": 33.5850, "lon": -7.5075},
+    2:  {"name": "Sidi Othmane",   "lat": 33.5583, "lon": -7.5613},
+    3:  {"name": "Sidi Moumen",    "lat": 33.5838, "lon": -7.5004},
     4:  {"name": "Hay Hassani",    "lat": 33.5465, "lon": -7.6803},
     5:  {"name": "Sbata",          "lat": 33.5358, "lon": -7.5580},
     6:  {"name": "Ben Msik",       "lat": 33.5414, "lon": -7.5650},
@@ -57,14 +85,50 @@ ZONE_INFO = {
     12: {"name": "Hay Mohammadi",  "lat": 33.5820, "lon": -7.5575},
     13: {"name": "Anfa",           "lat": 33.5950, "lon": -7.6525},
     14: {"name": "Sidi Belyout",   "lat": 33.5985, "lon": -7.6149},
-    15: {"name": "Casa-Anfa",      "lat": 33.6050, "lon": -7.5850},
+    15: {"name": "Ain Sebaa",      "lat": 33.6050, "lon": -7.5850},
     16: {"name": "Sidi Bernoussi", "lat": 33.6150, "lon": -7.5150},
 }
 
-# ── ML Model (loaded at startup) ────────────────────────────────────
-# The model will be loaded from a local path (downloaded from MinIO)
-# or directly from S3 if running in container
-model_pipeline = None
+_ZONE_CSV_CANDIDATES = [
+    os.getenv("ZONE_MAPPING_CSV", ""),
+    "/data/zone_mapping_v4.csv",
+    "/data/zone_mapping.csv",
+    os.path.join(os.path.dirname(__file__), "..", "data", "zone_mapping_v4.csv"),
+    os.path.join(os.path.dirname(__file__), "..", "data", "zone_mapping.csv"),
+]
+
+
+def _load_zone_info() -> dict:
+    """Parse zone CSV → {zone_id: {name, lat, lon}}. Returns fallback on error."""
+    for path in _ZONE_CSV_CANDIDATES:
+        if not path or not os.path.isfile(path):
+            continue
+        try:
+            out = {}
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    zid = int(row["zone_id"])
+                    # v4 uses centroid_lat / centroid_lon; v3 uses casa_centroid_lat
+                    lat = row.get("centroid_lat") or row.get("casa_centroid_lat")
+                    lon = row.get("centroid_lon") or row.get("casa_centroid_lon")
+                    name = row.get("name") or row.get("arrondissement_name") or f"Zone {zid}"
+                    if lat is None or lon is None:
+                        continue
+                    out[zid] = {"name": name, "lat": float(lat), "lon": float(lon)}
+            if out:
+                log.info("Loaded %d zones from %s", len(out), path)
+                return out
+        except Exception as e:  # pragma: no cover — degrade gracefully
+            log.warning("Failed to load %s: %s", path, e)
+    log.warning("No zone CSV found; using hard-coded fallback (%d zones)", len(_ZONE_FALLBACK))
+    return _ZONE_FALLBACK
+
+
+ZONE_INFO = _load_zone_info()
+
+# ── ML Model placeholder (loaded by startup hook when PYSPARK_ENABLED=1) ──
+# Initialized to None at module-import time in the Config section above.
 
 
 # ── Pydantic Models ─────────────────────────────────────────────────
@@ -152,20 +216,25 @@ def require_admin(token: dict = Depends(verify_token)):
     return token
 
 
-# ── Forecast logic (uses lag-based prediction when model unavailable)
+# ── Forecast logic ───────────────────────────────────────────────────
+# By default this is a deterministic heuristic (baseline curve + weekday +
+# zone-popularity modifiers). When PYSPARK_ENABLED=1 AND PySpark is importable,
+# we try to call the loaded GBT pipeline; on any failure we silently fall back
+# to the heuristic. See module docstring for how to enable PySpark mode.
 def predict_demand(zone_id: int, dt: datetime) -> float:
-    """Predict demand for a zone at a given datetime.
-    Uses ML model if loaded, otherwise falls back to historical average."""
+    """Predict demand for a zone at a given datetime."""
     hour = dt.hour
     day_of_week = dt.weekday()
     slot_of_day = hour * 2 + (1 if dt.minute >= 30 else 0)
     is_weekend = 1 if day_of_week >= 5 else 0
     is_peak = 1 if hour in [8, 9, 13, 14, 17, 18] else 0
 
-    if model_pipeline is not None:
-        # Use PySpark model for prediction
+    if PYSPARK_ENABLED and model_pipeline is not None:
+        # Optional PySpark path — only used when api/requirements.txt has been
+        # extended with pyspark + a JVM is available in the image. Default
+        # docker image (python:3.13-slim) does NOT support this branch.
         try:
-            from pyspark.sql import SparkSession, Row
+            from pyspark.sql import SparkSession, Row  # type: ignore
             spark = SparkSession.builder.getOrCreate()
             row = Row(
                 origin_zone=zone_id,
@@ -174,8 +243,8 @@ def predict_demand(zone_id: int, dt: datetime) -> float:
                 day_of_week=day_of_week,
                 is_weekend=is_weekend,
                 is_peak=is_peak,
-                supply_demand_ratio=0.5,  # default estimate
-                demand_lag_1d=50.0,       # historical average fallback
+                supply_demand_ratio=0.5,
+                demand_lag_1d=50.0,
                 demand_lag_7d=50.0,
                 rolling_7d_mean=50.0,
             )
@@ -291,11 +360,19 @@ async def get_zone(zone_id: int, token: dict = Depends(verify_token)):
 # ── Startup: load model ─────────────────────────────────────────────
 @app.on_event("startup")
 async def load_model():
-    """Try to load GBT model at startup."""
+    """Try to load the GBT model when PySpark mode is enabled.
+
+    In the default container image PySpark is not installed and PYSPARK_ENABLED
+    is 0, so this hook is a no-op and predict_demand() uses the heuristic.
+    """
     global model_pipeline
+    if not PYSPARK_ENABLED:
+        log.info("PYSPARK_ENABLED=0 — skipping model load; using heuristic forecast.")
+        model_pipeline = None
+        return
     try:
-        from pyspark.sql import SparkSession
-        from pyspark.ml import PipelineModel
+        from pyspark.sql import SparkSession  # type: ignore
+        from pyspark.ml import PipelineModel  # type: ignore
 
         spark = (
             SparkSession.builder
@@ -309,8 +386,8 @@ async def load_model():
             .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
             .getOrCreate()
         )
-        model_pipeline = PipelineModel.load("s3a://mldata/models/demand_v1/")
-        log.info("ML model loaded from s3a://mldata/models/demand_v1/")
+        model_pipeline = PipelineModel.load(MODEL_PATH)
+        log.info("ML model loaded from %s", MODEL_PATH)
     except Exception as e:
         log.warning("Could not load ML model (using heuristic fallback): %s", e)
         model_pipeline = None
