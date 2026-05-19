@@ -461,20 +461,30 @@ You can override these in `.env` when load-testing.
 |:--------|:-------|
 | **Goal** | Predict trip requests per zone for the next 30-minute slot |
 | **Algorithm** | Gradient Boosted Trees (Spark MLlib `GBTRegressor`, maxDepth=5, maxIter=50) |
-| **Training rows** | 183,981 feature rows (30-min slots × 16 zones, lag + rolling) |
-| **Evaluation** | Temporal split (no leakage) |
+| **Training rows** | 151,911 train / 32,070 test (30-min slots × 16 zones, lag + rolling) after dropping the first 7 days for lag warm-up |
+| **Evaluation** | Temporal split at `2014-05-01`, no target leakage (see note below) |
 | **Baseline** | Naive 7-day-lag predictor |
-| **Result** | **RMSE 3.71 · R² 0.75 · 45.8% better than baseline** (baseline RMSE 6.84) |
-| **Artifact** | `s3a://mldata/models/demand_v1/` (loaded by FastAPI at startup) |
+| **Result (retrained 2026-05-19)** | RMSE **4.69** · MAE **3.01** · R² **0.60** · −31.4% vs baseline (RMSE 6.84) |
+| **Artifact** | `s3a://mldata/models/demand_v1/` (offline-only; not loaded by the API by default — see Serving) |
+
+> **Leakage fix.** A previous revision of `spark/feature_engineering.py` shipped
+> `supply_demand_ratio = supply / demand` and `supply` as features, both
+> computed from the same 30-min slot as the target. They were removed from
+> the feature matrix and the model was retrained. The pre-fix run reported
+> RMSE 3.71 / R² 0.75; those numbers are over-optimistic and must not be
+> quoted as current performance.
 
 ### Feature Engineering
 
+Features actually emitted by [spark/feature_engineering.py](spark/feature_engineering.py) and consumed by [spark/train_demand_model.py](spark/train_demand_model.py):
+
 | Group | Features |
 |:------|:---------|
-| **Temporal** | hour_of_day, day_of_week, is_weekend, is_friday |
-| **Spatial** | zone_id, population_density, zone_type |
-| **Weather** | is_raining, temperature_bucket |
-| **Lag** | demand_lag_1d, demand_lag_7d, rolling_7d_mean |
+| **Temporal** | `hour_of_day`, `day_of_week`, `is_weekend`, `is_peak` (08–09, 13–14, 17–18), `slot_of_day` (0–47) |
+| **Spatial** | `origin_zone` → `zone_idx` (StringIndexer over the 16 Casablanca zones) |
+| **Lag** | `demand_lag_1d`, `demand_lag_7d`, `rolling_7d_mean` (same zone + slot) |
+
+No weather or population-density features are produced today.
 
 ### Serving — FastAPI ([api/main.py](api/main.py))
 
@@ -483,7 +493,7 @@ Seven endpoints, JWT-protected (`HS256`, 24h expiry, two roles: `rider` + `admin
 | Method | Path | Role | Purpose |
 |:------|:-----|:-----|:--------|
 | `POST` | `/api/auth/token`      | public | Issue JWT (demo creds — username + role) |
-| `POST` | `/api/demand/forecast` | rider/admin | Demand prediction for `(zone_id, datetime)` — heuristic by default; GBT when `PYSPARK_ENABLED=1` (see `api/main.py`) |
+| `POST` | `/api/demand/forecast` | rider/admin | Demand prediction for `(zone_id, datetime)` — **heuristic by default**; the saved GBT artifact is offline-only and is only used in-process if `PYSPARK_ENABLED=1` AND a JDK + PySpark are added to the image (see `api/main.py` module docstring) |
 | `POST` | `/api/trips`           | rider/admin | Publish a trip request to Kafka `raw.trips` (for Flink Job 3 matching), return queued acknowledgment |
 | `GET`  | `/api/zones`           | rider/admin | List all 16 Casablanca zones (from `data/zone_mapping_v4.csv`) |
 | `GET`  | `/api/zones/{zone_id}` | rider/admin | Zone detail |
@@ -533,7 +543,7 @@ Taasimm/
 │   ├── etl_nyc.py                  # 9.38M → 192K demand agg rows
 │   ├── compute_kpis.py             # 6 KPI datasets
 │   ├── feature_engineering.py      # 183,981 ML feature rows
-│   ├── train_demand_model.py       # GBT — RMSE 3.71, R² 0.75
+│   ├── train_demand_model.py       # GBT — retrained 2026-05-19, RMSE 4.69, R² 0.60
 │   └── verify_model.py
 │
 ├── api/                            # FastAPI REST (Week 6)
@@ -608,7 +618,7 @@ Taasimm/
 | 3 | Flink Job 1 (GPS normalizer), watermarks, Grafana vehicle map | ✅ Done |
 | 4 | Flink Job 2 (demand) + Job 3 (trip matcher), immediate adjacent-zone fan-out with dedup | ✅ Done |
 | 5 | Spark ETL on Porto + NYC, KPI computation | ✅ Done |
-| 6 | ML feature engineering, GBT training, FastAPI forecast endpoint | ✅ Done — RMSE 3.71, R² 0.75 |
+| 6 | ML feature engineering, GBT training, FastAPI forecast endpoint | ✅ Done — retrained 2026-05-19 post leakage fix: RMSE 4.69, R² 0.60, −31.4% vs baseline |
 | 7 | JWT hardening, GPS anonymization audit, integration testing, SLA, checkpoint recovery | 🟡 In progress |
 | 8 | Grafana polish, live demo, pitch deck, technical report | ⬜ Planned |
 

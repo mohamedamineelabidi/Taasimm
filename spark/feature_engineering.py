@@ -5,8 +5,15 @@ Reads curated Porto trips from s3a://curated/trips/ and builds a
 feature matrix for demand forecasting.
 
 Target: trip requests per zone per 30-min slot
-Features: hour, day_of_week, is_weekend, zone_id, slot_of_day,
-          demand_lag_1d, demand_lag_7d, rolling_7d_mean
+Features: hour_of_day, day_of_week, is_weekend, is_peak, zone_id,
+          slot_of_day, demand_lag_1d, demand_lag_7d, rolling_7d_mean
+
+Note on leakage: a previous revision included `supply_demand_ratio`
+(= supply / demand) and `supply` for the same time slot as the target.
+Both values are derived from the current 30-min slot's trip events and
+therefore leak the target. They are no longer written into the feature
+matrix used for training. Lag features (1d / 7d / 7d rolling mean) are
+the only retrospective signals retained.
 
 Output: s3a://mldata/features/ (Parquet)
 
@@ -20,7 +27,7 @@ Usage (inside Spark container):
 import logging
 from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
-from pyspark.sql.types import IntegerType, DoubleType
+from pyspark.sql.types import IntegerType
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,7 +78,6 @@ def main():
         .groupBy("origin_zone", "trip_date", "slot_of_day")
         .agg(
             F.count("*").alias("demand"),
-            F.countDistinct("taxi_id").alias("supply"),
             F.first("day_of_week").alias("day_of_week"),
             F.first("is_weekend").alias("is_weekend"),
         )
@@ -113,21 +119,13 @@ def main():
         "rolling_7d_mean", F.avg("demand").over(w_rolling)
     )
 
-    # ── 5. Supply/demand ratio ───────────────────────────────────────
-    demand_lagged = demand_lagged.withColumn(
-        "supply_demand_ratio",
-        F.when(F.col("demand") > 0,
-               F.col("supply").cast(DoubleType()) / F.col("demand"))
-        .otherwise(F.lit(0.0))
-    )
-
-    # ── 6. Is peak hour feature ──────────────────────────────────────
+    # ── 5. Is peak hour feature ──────────────────────────────────────
     demand_lagged = demand_lagged.withColumn(
         "is_peak",
         F.when(F.col("hour_of_day").isin([8, 9, 13, 14, 17, 18]), 1).otherwise(0)
     )
 
-    # ── 7. Drop rows with null lag features (first 7 days) ──────────
+    # ── 6. Drop rows with null lag features (first 7 days) ──────────
     features = demand_lagged.filter(
         F.col("demand_lag_1d").isNotNull() &
         F.col("demand_lag_7d").isNotNull() &
@@ -137,7 +135,10 @@ def main():
     log.info("Feature rows after lag filter: %d (dropped %d with null lags)",
              feature_count, demand_count - feature_count)
 
-    # ── 8. Select final feature columns ──────────────────────────────
+    # ── 7. Select final feature columns ──────────────────────────────
+    # Note: `supply` and `supply_demand_ratio` are intentionally NOT written.
+    # Both are computed from the same 30-min slot as the target and would
+    # leak `demand` into training.
     feature_matrix = features.select(
         "origin_zone",
         "trip_date",
@@ -147,14 +148,12 @@ def main():
         "is_weekend",
         "is_peak",
         "demand",           # target variable
-        "supply",
-        "supply_demand_ratio",
         "demand_lag_1d",
         "demand_lag_7d",
         "rolling_7d_mean",
     )
 
-    # ── 9. Write feature matrix ──────────────────────────────────────
+    # ── 8. Write feature matrix ──────────────────────────────────────
     log.info("Writing feature matrix to %s", OUTPUT_PATH)
     (
         feature_matrix
@@ -164,7 +163,7 @@ def main():
         .parquet(OUTPUT_PATH)
     )
 
-    # ── 10. Summary ─────────────────────────────────────────────────
+    # ── 9. Summary ──────────────────────────────────────────────────
     log.info("=== Feature Engineering Summary ===")
     log.info("  Input trips:     %d", total)
     log.info("  Demand rows:     %d", demand_count)
@@ -178,7 +177,7 @@ def main():
 
     # Show feature stats
     feature_matrix.describe("demand", "demand_lag_1d", "demand_lag_7d",
-                            "rolling_7d_mean", "supply_demand_ratio").show()
+                            "rolling_7d_mean").show()
 
     log.info("  Output: %s", OUTPUT_PATH)
     log.info("=== Feature Engineering Complete ===")

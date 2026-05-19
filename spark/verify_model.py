@@ -29,7 +29,7 @@ for i, stage in enumerate(model.stages):
 # ── 3. Feature importances ───────────────────────────────────────
 FEATURE_COLS = [
     "hour_of_day", "day_of_week", "is_weekend", "is_peak",
-    "zone_idx", "slot_of_day", "supply_demand_ratio",
+    "zone_idx", "slot_of_day",
     "demand_lag_1d", "demand_lag_7d", "rolling_7d_mean",
 ]
 gbt = model.stages[-1]
@@ -47,10 +47,10 @@ print("="*60)
 # Simulate: zone 1 (Ain Chock), Wednesday, 8:00 AM rush hour
 # vs same zone, Sunday 3:00 AM
 samples = [
-    Row(origin_zone="1", slot_of_day=16, hour_of_day=8,  day_of_week=2, is_weekend=0, is_peak=1, supply_demand_ratio=0.5, demand_lag_1d=60.0, demand_lag_7d=55.0, rolling_7d_mean=58.0),
-    Row(origin_zone="1", slot_of_day=6,  hour_of_day=3,  day_of_week=6, is_weekend=1, is_peak=0, supply_demand_ratio=0.8, demand_lag_1d=8.0,  demand_lag_7d=7.0,  rolling_7d_mean=7.5),
-    Row(origin_zone="8", slot_of_day=36, hour_of_day=18, day_of_week=4, is_weekend=0, is_peak=1, supply_demand_ratio=0.3, demand_lag_1d=70.0, demand_lag_7d=65.0, rolling_7d_mean=68.0),
-    Row(origin_zone="16",slot_of_day=24, hour_of_day=12, day_of_week=0, is_weekend=0, is_peak=0, supply_demand_ratio=0.6, demand_lag_1d=40.0, demand_lag_7d=38.0, rolling_7d_mean=39.0),
+    Row(origin_zone="1", slot_of_day=16, hour_of_day=8,  day_of_week=2, is_weekend=0, is_peak=1, demand_lag_1d=60.0, demand_lag_7d=55.0, rolling_7d_mean=58.0),
+    Row(origin_zone="1", slot_of_day=6,  hour_of_day=3,  day_of_week=6, is_weekend=1, is_peak=0, demand_lag_1d=8.0,  demand_lag_7d=7.0,  rolling_7d_mean=7.5),
+    Row(origin_zone="8", slot_of_day=36, hour_of_day=18, day_of_week=4, is_weekend=0, is_peak=1, demand_lag_1d=70.0, demand_lag_7d=65.0, rolling_7d_mean=68.0),
+    Row(origin_zone="16",slot_of_day=24, hour_of_day=12, day_of_week=0, is_weekend=0, is_peak=0, demand_lag_1d=40.0, demand_lag_7d=38.0, rolling_7d_mean=39.0),
 ]
 test_df = spark.createDataFrame(samples)
 preds = model.transform(test_df)

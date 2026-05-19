@@ -35,7 +35,10 @@ FEATURES_PATH = "s3a://mldata/features/"
 MODEL_PATH = "s3a://mldata/models/demand_v1/"
 METRICS_PATH = "s3a://mldata/metrics/demand_v1/"
 
-# Feature columns for the model
+# Feature columns for the model.
+# `supply` and `supply_demand_ratio` were removed from the feature matrix
+# in feature_engineering.py because both were computed from the same
+# 30-min slot as the target `demand` and therefore leaked the label.
 FEATURE_COLS = [
     "hour_of_day",
     "day_of_week",
@@ -43,7 +46,6 @@ FEATURE_COLS = [
     "is_peak",
     "zone_idx",          # StringIndexer output
     "slot_of_day",
-    "supply_demand_ratio",
     "demand_lag_1d",
     "demand_lag_7d",
     "rolling_7d_mean",

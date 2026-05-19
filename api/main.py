@@ -18,10 +18,23 @@ The slim API image does NOT bundle PySpark. The demand forecast endpoint runs in
 **heuristic mode** by default: a baseline demand curve adjusted by weekday and
 zone popularity. This is deterministic, fast (<5 ms), and beats no-prediction.
 
-To enable the real GBT model loaded from `s3a://mldata/models/demand_v1/`:
+The GBT artifact at `s3a://mldata/models/demand_v1/` is produced offline by
+`spark/train_demand_model.py` and is intended for **offline evaluation** of the
+demand-forecast baseline-beat requirement. The API does NOT load it by default
+because:
+  1. The slim runtime has no JVM / PySpark.
+  2. The GBT was trained on lag features (`demand_lag_1d`, `demand_lag_7d`,
+     `rolling_7d_mean`) and the live API has no per-zone/per-slot historical
+     demand store to compute those at request time. Calling the model with
+     constant placeholder lags collapses it to a near-static curve.
+
+To enable an experimental in-process GBT path (placeholders for lags, intended
+only for a stack with PySpark already available):
   1. Add `pyspark==3.5.4` and an S3A-capable Hadoop bundle to api/requirements.txt
   2. Rebuild the image with a JDK base (current python:3.13-slim has no Java).
   3. Set `PYSPARK_ENABLED=1` in the api service environment.
+  4. Replace the constant lag placeholders in `predict_demand()` with a real
+     feature builder (e.g. Cassandra/MinIO lookup) before relying on results.
 
 Status of `model_loaded` is exposed via `/api/health` so dashboards can tell
 which mode is active.
@@ -339,7 +352,10 @@ def predict_demand(zone_id: int, dt: datetime) -> float:
                 day_of_week=day_of_week,
                 is_weekend=is_weekend,
                 is_peak=is_peak,
-                supply_demand_ratio=0.5,
+                # Lag features are placeholders: the slim API has no live
+                # source of yesterday/last-week demand per zone+slot. With
+                # constant lags the GBT collapses to a near-static curve;
+                # documented as a known limitation.
                 demand_lag_1d=50.0,
                 demand_lag_7d=50.0,
                 rolling_7d_mean=50.0,

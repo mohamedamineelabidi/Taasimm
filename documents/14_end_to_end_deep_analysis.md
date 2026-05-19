@@ -64,7 +64,8 @@ Kafka is the **only** system of record for live data. Flink is the **only** real
 │  Flink checkpoints      ──► MinIO s3://curated/flink-checkpoints/         │
 │                                                                           │
 │  Cassandra ◄── Grafana (Cassandra datasource plugin)                      │
-│  Cassandra ◄── FastAPI  (JWT, GBT model loaded from mldata/models/)       │
+│  Cassandra ◄── FastAPI  (JWT; demand forecast served via heuristic by      │
+│             default — GBT artifact in mldata/models/ is offline-only)       │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -77,7 +78,7 @@ Kafka is the **only** system of record for live data. Flink is the **only** real
 5. **Flink Job 2** unions `processed.gps` + `raw.trips` on a `(city, zone_id)` key, opens a 30-second event-time tumbling window, counts **distinct** `taxi_id` and trip events, computes `ratio = requests / max(1, vehicles)`, writes `demand_zones` (TTL 7d) and forwards to `processed.demand`.
 6. **Flink Job 3** maintains `MapState<zone_id, Map<taxi_id, position>>` (TTL 60s). Trip requests are fanned out immediately to origin + adjacent zones, each zone scores local vehicles via `0.7·distance_km + 0.3·idle_penalty`, the first successful match wins through dedup, then the job computes `eta_seconds` and fare, writes `trips`, and forwards to `processed.matches`.
 7. **Grafana** queries Cassandra every ~5s (Geomap panel on `vehicle_positions`, bar/heatmap on `demand_zones`) → user sees live taxi dots and zone heatmap.
-8. **FastAPI** serves `/api/demand/forecast` — GBT model loaded once from `s3a://mldata/models/demand_v1/` at startup; queries Cassandra for live features, returns prediction in <500ms.
+8. **FastAPI** serves `/api/demand/forecast` using a deterministic heuristic by default (baseline curve + weekday + zone popularity). The Spark GBT pipeline at `s3a://mldata/models/demand_v1/` is produced offline by `spark/train_demand_model.py` and is **not** loaded by the slim API image; it can be wired in as an experimental path when `PYSPARK_ENABLED=1` and a JDK + PySpark are added to the runtime.
 
 ---
 
@@ -300,7 +301,7 @@ Live Kafka events come from **three offline artifacts**:
 - **`spark/etl_nyc.py`** — 3 months NYC Parquet → schema-drift normalization → outlier filter → per-zone/hour aggregation.
 - **`spark/compute_kpis.py`** — 6 KPI datasets: `trips_per_zone`, `hourly_demand`, `daily_pattern`, `zone_hour_heatmap`, `coverage_gaps`, `call_type_breakdown`.
 - **`spark/feature_engineering.py`** — 30-min slot aggregation, `demand_lag_1d/7d`, `rolling_7d_mean` → `s3a://mldata/features/`.
-- **`spark/train_demand_model.py`** — GBT training (maxDepth=5, maxIter=50), temporal split, beats naive baseline by 45.8% (RMSE 3.71 vs 6.84).
+- **`spark/train_demand_model.py`** — GBT training (maxDepth=5, maxIter=50), temporal split. Retrained 2026-05-19 after a target-leakage fix (`supply` and `supply_demand_ratio` were derived from the same 30-min slot as the label and have been removed from the feature matrix and `FEATURE_COLS`). Post-fix metrics: RMSE 4.69 vs baseline 6.84 (−31.4%), MAE 3.01, R² 0.60. The earlier RMSE 3.71 / R² 0.75 figures are leaking and must not be quoted.
 
 ### 7.4 Scripts (highlights)
 - **`build_trajectory_index.py`** — builds dual-key lookup JSON for coupled mode.
