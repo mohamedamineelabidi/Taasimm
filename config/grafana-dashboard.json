@@ -175,7 +175,7 @@
     },
     {
       "id": 1,
-      "title": "Vehicle Positions (Live)",
+      "title": "Vehicle Positions (Road-snapped Live)",
       "type": "geomap",
       "gridPos": {
         "h": 16,
@@ -196,7 +196,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 15"
         },
         {
           "refId": "B",
@@ -206,7 +206,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 15"
         },
         {
           "refId": "C",
@@ -216,7 +216,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 15"
         },
         {
           "refId": "D",
@@ -226,7 +226,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 15"
         },
         {
           "refId": "E",
@@ -236,7 +236,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 15"
         },
         {
           "refId": "F",
@@ -246,7 +246,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 15"
         },
         {
           "refId": "G",
@@ -256,7 +256,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 15"
         },
         {
           "refId": "H",
@@ -266,7 +266,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 15"
         },
         {
           "refId": "I",
@@ -276,7 +276,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 15"
         },
         {
           "refId": "J",
@@ -286,7 +286,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 15"
         },
         {
           "refId": "K",
@@ -296,7 +296,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 15"
         },
         {
           "refId": "L",
@@ -306,7 +306,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 15"
         },
         {
           "refId": "M",
@@ -316,7 +316,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 15"
         },
         {
           "refId": "N",
@@ -326,7 +326,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 15"
         },
         {
           "refId": "O",
@@ -336,7 +336,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 15"
         },
         {
           "refId": "P",
@@ -346,7 +346,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 15"
+          "target": "SELECT taxi_id, lat, lon, zone_id, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 15"
         }
       ],
       "transformations": [
@@ -779,7 +779,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=1 LIMIT 5"
         },
         {
           "refId": "B",
@@ -789,7 +789,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=2 LIMIT 5"
         },
         {
           "refId": "C",
@@ -799,7 +799,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=3 LIMIT 5"
         },
         {
           "refId": "D",
@@ -809,7 +809,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=4 LIMIT 5"
         },
         {
           "refId": "E",
@@ -819,7 +819,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=5 LIMIT 5"
         },
         {
           "refId": "F",
@@ -829,7 +829,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=6 LIMIT 5"
         },
         {
           "refId": "G",
@@ -839,7 +839,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=7 LIMIT 5"
         },
         {
           "refId": "H",
@@ -849,7 +849,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=8 LIMIT 5"
         },
         {
           "refId": "I",
@@ -859,7 +859,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=9 LIMIT 5"
         },
         {
           "refId": "J",
@@ -869,7 +869,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=10 LIMIT 5"
         },
         {
           "refId": "K",
@@ -879,7 +879,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=11 LIMIT 5"
         },
         {
           "refId": "L",
@@ -889,7 +889,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=12 LIMIT 5"
         },
         {
           "refId": "M",
@@ -899,7 +899,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=13 LIMIT 5"
         },
         {
           "refId": "N",
@@ -909,7 +909,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=14 LIMIT 5"
         },
         {
           "refId": "O",
@@ -919,7 +919,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=15 LIMIT 5"
         },
         {
           "refId": "P",
@@ -929,7 +929,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 5"
+          "target": "SELECT taxi_id, zone_id, lat, lon, speed, status, event_time, snap_dist_m FROM taasim.vehicle_positions WHERE city='casablanca' AND zone_id=16 LIMIT 5"
         }
       ],
       "transformations": [

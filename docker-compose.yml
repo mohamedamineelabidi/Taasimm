@@ -197,6 +197,7 @@ services:
     entrypoint: /opt/flink/entrypoint-wrapper.sh
     command: taskmanager
     environment:
+      GPS_DISPLAY_MODE: "${GPS_DISPLAY_MODE:-road}"
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4

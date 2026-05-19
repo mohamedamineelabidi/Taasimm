@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS vehicle_positions (
     speed       DOUBLE,
     status      TEXT,
     h3_index    TEXT,
+    snap_dist_m DOUBLE,
     PRIMARY KEY ((city, zone_id), event_time, taxi_id)
 ) WITH CLUSTERING ORDER BY (event_time DESC, taxi_id ASC)
   AND default_time_to_live = 86400

@@ -49,6 +49,7 @@ function Ensure-Column {
 }
 
 Ensure-Column -TableName "vehicle_positions" -ColumnName "h3_index" -ColumnType "text"
+Ensure-Column -TableName "vehicle_positions" -ColumnName "snap_dist_m" -ColumnType "double"
 Ensure-Column -TableName "trips" -ColumnName "origin_h3" -ColumnType "text"
 Ensure-Column -TableName "trips" -ColumnName "dest_h3" -ColumnType "text"
 

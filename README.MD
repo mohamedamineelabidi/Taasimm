@@ -280,6 +280,28 @@ You should see `Cassandra | hadesarchitect-cassandra-datasource | cassandra:9042
 
 The `${replay_date}` template variable is a textbox that defaults to `${__from:date:YYYY-MM-DD}` — the UTC date at the start of the dashboard time range. Override it to inspect a historical replay date (the partition key for `trips`).
 
+### Vehicle GPS Display Mode
+
+The `vehicle_positions` map can be rendered two ways. The mode is selected by `GPS_DISPLAY_MODE` on the `flink-taskmanager` service (read by `flink/jobs/gps_normalizer.py`).
+
+| Mode | `GPS_DISPLAY_MODE` | What gets stored in `vehicle_positions.lat/lon` |
+|------|--------------------|--------------------------------------------------|
+| **Road-snapped live** *(default)* | `road` | The producer's road-snapped + GPS-noised coordinates. Markers appear on or very near actual Casablanca streets. |
+| Anonymized centroid | `anonymized` | Zone centroid + deterministic per-taxi jitter (legacy privacy mode). Markers cluster inside each zone. |
+
+Switch modes (requires resubmitting Job 1):
+
+```powershell
+$env:GPS_DISPLAY_MODE = "road"        # default
+docker compose up -d --force-recreate flink-taskmanager
+# Cancel old GPS Normalizer in Flink UI, then:
+.\scripts\submit-flink-jobs.ps1 -Jobs 1
+```
+
+The producer always road-snaps trajectory points after applying Gaussian GPS noise (~20 m sigma) and rejects pings whose snap distance exceeds `GPS_MAX_SNAP_DIST_M` (default 80 m). The real snap distance is written to `vehicle_positions.snap_dist_m` and surfaced in the Grafana panel "Vehicle Positions (Road-snapped Live)" tooltip + the "Recent GPS Events" table.
+
+The `processed.gps` Kafka topic always carries both `road_lat/road_lon` and `anon_lat/anon_lon` for downstream consumers that need either signal regardless of the storage mode.
+
 ### Simulation Modes
 
 Two demo personas are supported via env vars consumed by `trip-producer`. They only affect *where* trip requests originate / terminate; vehicle GPS trajectories are unaffected.
@@ -321,6 +343,19 @@ Checks (read-only, no volumes touched by default):
 5. `demand_zones` latest row is within `-MaxDemandAgeSeconds` (default 90s).
 6. At least one trip exists in today's UTC `date_bucket`.
 7. Prints service URLs.
+
+### Vehicle Movement Realism Check
+
+```powershell
+.\scripts\check-vehicle-movement.ps1 -MaxSnapDistM 100 -ZoneId 1
+```
+
+Verifies the geomap shows real movement (not stuck on centroid+jitter):
+
+1. Same taxi must produce distinct lat/lon across consecutive pings (>= 80% of sampled taxis).
+2. `status='moving'` rows must have `speed >= 1 km/h`; `status='idle'` rows must have `speed < 5 km/h`.
+3. `snap_dist_m` must be within the supplied threshold (NULL allowed only on legacy rows pre-migration).
+4. All latest sampled points fall inside the Casablanca bounding box.
 
 `-Reset` is opt-in and prompts for an explicit `DESTROY` confirmation before running `docker compose down -v`. Volumes are **never** removed by default.
 

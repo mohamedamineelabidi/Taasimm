@@ -64,6 +64,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# Reject points further than this from the nearest road node after the
+# noise+snap step. ~80m keeps markers visibly on/near roads without
+# discarding legitimate jittered points from the ~20m Gaussian.
+MAX_SNAP_DIST_M = float(os.environ.get("GPS_MAX_SNAP_DIST_M", "80.0"))
+
 
 def parse_polyline(polyline_str):
     """Parse POLYLINE JSON string → list of [lon, lat] pairs."""
@@ -416,6 +421,7 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
 
         prev_lat = None
         prev_lon = None
+        rejected = 0
         for k in range(n_pings):
             frac = k / (n_pings - 1) if n_pings > 1 else 0.0
             idx_f = frac * (len(pts) - 1)
@@ -427,6 +433,17 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
             # GPS noise ~20m
             lat += np.random.normal(0, NOISE_SIGMA)
             lon += np.random.normal(0, NOISE_SIGMA)
+
+            # Road-snap the noisy point so taxis appear on roads, not in
+            # buildings/parks. Reject points whose post-snap distance exceeds
+            # MAX_SNAP_DIST_M (off-road outliers).
+            snapped_lat, snapped_lon, snap_dist_m, snapped_valid = snap_to_road(
+                lat, lon, h3_lookup=h3_lookup
+            )
+            if not snapped_valid or snap_dist_m > MAX_SNAP_DIST_M:
+                rejected += 1
+                continue
+            lat, lon = snapped_lat, snapped_lon
 
             src_ts = base_src + k * ping_interval_s
             planned_wall_ts = src_to_wall(src_ts)
@@ -462,7 +479,7 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
                 "status": status,
                 "h3_index": h3_cell,
                 "zone_id": zone_id,
-                "snap_dist_m": 0.0,
+                "snap_dist_m": round(float(snap_dist_m), 2),
                 "source": "coupled_v1",
             }
             heapq.heappush(heap, (wall_ts, counter, taxi, trip_id, event))
