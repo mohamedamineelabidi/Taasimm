@@ -10,21 +10,169 @@
   "templating": {
     "list": [
       {
-        "name": "date_bucket",
-        "label": "Date Bucket",
-        "type": "custom",
-        "query": "2026-04-21,2026-04-20,2026-04-19,2026-04-18",
-        "current": { "text": "2026-04-21", "value": "2026-04-21" },
-        "options": [
-          { "text": "2026-04-21", "value": "2026-04-21", "selected": true },
-          { "text": "2026-04-20", "value": "2026-04-20", "selected": false },
-          { "text": "2026-04-19", "value": "2026-04-19", "selected": false },
-          { "text": "2026-04-18", "value": "2026-04-18", "selected": false }
-        ]
+        "name": "replay_date",
+        "label": "Replay Date Bucket (UTC)",
+        "description": "Cassandra partition key for the trips table. Defaults to the UTC date at the start of the dashboard time range (today for the live demo). Override to inspect a historical replay date.",
+        "type": "textbox",
+        "query": "${__from:date:YYYY-MM-DD}",
+        "current": { "text": "${__from:date:YYYY-MM-DD}", "value": "${__from:date:YYYY-MM-DD}" },
+        "options": []
       }
     ]
   },
   "panels": [
+    {
+      "id": 100,
+      "title": "Active Vehicles (latest 30s window)",
+      "description": "Sum across all 16 Casablanca zones of the most recent demand_zones.active_vehicles snapshot. Live data from Flink Demand Aggregator.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        { "refId": "A", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=1 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "B", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=2 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "C", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=3 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "D", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=4 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "E", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=5 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "F", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=6 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "G", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=7 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "H", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=8 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "I", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=9 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "J", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=10 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "K", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=11 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "L", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=12 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "M", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=13 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "N", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=14 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "O", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=15 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "P", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, active_vehicles FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=16 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        { "id": "filterFieldsByName", "options": { "include": { "names": ["active_vehicles"] } } },
+        { "id": "reduce", "options": { "reducers": ["sum"], "labelsToFields": false } }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 200 } ] },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 101,
+      "title": "Pending Requests (latest 30s window)",
+      "description": "Sum across all 16 zones of pending trip requests in the most recent demand_zones snapshot.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        { "refId": "A", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=1 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "B", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=2 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "C", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=3 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "D", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=4 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "E", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=5 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "F", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=6 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "G", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=7 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "H", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=8 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "I", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=9 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "J", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=10 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "K", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=11 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "L", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=12 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "M", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=13 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "N", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=14 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "O", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=15 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } },
+        { "refId": "P", "queryType": "query", "rawQuery": true, "target": "SELECT zone_id, pending_requests FROM taasim.demand_zones WHERE city='casablanca' AND zone_id=16 LIMIT 1", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        { "id": "filterFieldsByName", "options": { "include": { "names": ["pending_requests"] } } },
+        { "id": "reduce", "options": { "reducers": ["sum"], "labelsToFields": false } }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 } ] },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 102,
+      "title": "Trips by Status (replay date)",
+      "description": "Breakdown of trips in the selected replay_date partition. matched = Flink Trip Matcher assigned a taxi; no_vehicle = no suitable vehicle within adjacent zones.",
+      "type": "piechart",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        { "refId": "A", "queryType": "query", "rawQuery": true, "target": "SELECT trip_id, status FROM taasim.trips WHERE city='casablanca' AND date_bucket='${replay_date}' LIMIT 500", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } }
+      ],
+      "transformations": [
+        { "id": "groupBy", "options": { "fields": { "status": { "operation": "groupby", "aggregations": [] }, "trip_id": { "operation": "aggregate", "aggregations": ["count"] } } } },
+        { "id": "organize", "options": { "renameByName": { "trip_id (count)": "count" } } }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "pieType": "donut",
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "right", "values": ["value", "percent"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "mappings": []
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "matched" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+          { "matcher": { "id": "byName", "options": "no_vehicle" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] }
+        ]
+      }
+    },
+    {
+      "id": 103,
+      "title": "Trips Today (replay date)",
+      "description": "Total trips written to Cassandra for the replay_date partition (capped at 500 for display).",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" },
+      "targets": [
+        { "refId": "A", "queryType": "query", "rawQuery": true, "target": "SELECT trip_id FROM taasim.trips WHERE city='casablanca' AND date_bucket='${replay_date}' LIMIT 500", "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "cassandra-ds" } }
+      ],
+      "transformations": [
+        { "id": "reduce", "options": { "reducers": ["count"], "labelsToFields": false } }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 1 }, { "color": "green", "value": 20 } ] },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
     {
       "id": 1,
       "title": "Vehicle Positions (Live)",
@@ -33,7 +181,7 @@
         "h": 16,
         "w": 16,
         "x": 0,
-        "y": 0
+        "y": 4
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -273,7 +421,7 @@
         "h": 16,
         "w": 8,
         "x": 16,
-        "y": 0
+        "y": 4
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -479,10 +627,23 @@
           }
         },
         {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "zone_id",
+                "destinationType": "string"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "renameByName": {
-              "taxi_id (count)": "vehicle_count"
+              "taxi_id (count)": "vehicle_count",
+              "zone_id": "Zone"
             }
           }
         }
@@ -496,7 +657,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 20
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -511,7 +672,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 100"
+          "target": "SELECT trip_id, rider_id, origin_lat, origin_lon, dest_lat, dest_lon, origin_zone, dest_zone, status, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='${replay_date}' LIMIT 100"
         }
       ],
       "options": {
@@ -603,7 +764,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 36
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -812,7 +973,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 46
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -1067,11 +1228,24 @@
           }
         },
         {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "zone_id",
+                "destinationType": "string"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "renameByName": {
               "active_vehicles (sum)": "active_vehicles",
-              "pending_requests (sum)": "pending_requests"
+              "pending_requests (sum)": "pending_requests",
+              "zone_id": "Zone"
             }
           }
         }
@@ -1085,7 +1259,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 46
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -1294,7 +1468,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 56
       },
       "datasource": {
         "type": "hadesarchitect-cassandra-datasource",
@@ -1309,17 +1483,7 @@
           },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='$date_bucket' LIMIT 50"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "hadesarchitect-cassandra-datasource",
-            "uid": "cassandra-ds"
-          },
-          "queryType": "query",
-          "rawQuery": true,
-          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='2026-04-20' LIMIT 50"
+          "target": "SELECT trip_id, rider_id, taxi_id, status, origin_zone, dest_zone, eta_seconds, fare, created_at FROM taasim.trips WHERE city='casablanca' AND date_bucket='${replay_date}' LIMIT 50"
         }
       ],
       "transformations": [

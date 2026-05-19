@@ -414,6 +414,8 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
         blackout_at = random.randint(1, n_pings - 1) if has_blackout else -1
         blackout_delay_s = random.randint(*BLACKOUT_DELAY) if has_blackout else 0
 
+        prev_lat = None
+        prev_lon = None
         for k in range(n_pings):
             frac = k / (n_pings - 1) if n_pings > 1 else 0.0
             idx_f = frac * (len(pts) - 1)
@@ -439,6 +441,16 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
                     blackouts += 1
 
             status = "pickup" if k == 0 else ("dropoff" if k == n_pings - 1 else "moving")
+            # Realistic per-ping speed: derived from consecutive positions.
+            # First ping has no predecessor, so use 0 with status=pickup.
+            if prev_lat is None or prev_lon is None:
+                speed_kmh = 0.0
+            else:
+                speed_kmh = compute_speed(prev_lat, prev_lon, lat, lon, ping_interval_s)
+            # Keep status consistent with speed: an intermediate near-stationary
+            # ping is "idle", not "moving" (avoids speed=0 + status=moving lies).
+            if status == "moving" and speed_kmh < 1.0:
+                status = "idle"
             zone_id, _, h3_cell = assign_h3_zone(lat, lon, h3_lookup)
             event = {
                 "taxi_id": taxi,
@@ -446,7 +458,7 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
                 "event_time": datetime.fromtimestamp(planned_wall_ts, tz=timezone.utc).isoformat(),
                 "lat": round(lat, 6),
                 "lon": round(lon, 6),
-                "speed_kmh": 0.0,   # computed downstream if needed
+                "speed_kmh": round(speed_kmh, 2),
                 "status": status,
                 "h3_index": h3_cell,
                 "zone_id": zone_id,
@@ -455,6 +467,7 @@ def run_coupled(max_trips, speed, ping_interval_s, fleet_size):
             }
             heapq.heappush(heap, (wall_ts, counter, taxi, trip_id, event))
             counter += 1
+            prev_lat, prev_lon = lat, lon
         trips_expanded += 1
 
     # Seed: expand all trips within first 5 minutes of source window, then top up as we drain

@@ -247,6 +247,10 @@ services:
     hostname: trip-producer
     environment:
       KAFKA_BOOTSTRAP: "kafka:9092"
+      TRIP_ZONE_MODE: "${TRIP_ZONE_MODE:-organic}"
+      TRIP_STRESS_HOT_ZONES: "${TRIP_STRESS_HOT_ZONES:-1,2,3}"
+      TRIP_STRESS_COLD_ZONES: "${TRIP_STRESS_COLD_ZONES:-13,16}"
+      TRIP_STRESS_FRACTION: "${TRIP_STRESS_FRACTION:-0.7}"
     command: ["python", "trip_request_producer.py", "--source", "casa_synth", "--speed", "${TRIP_PRODUCER_SPEED:-12}"]
     volumes:
       - ./data:/data

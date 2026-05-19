@@ -265,6 +265,65 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/datasources" -Headers $h |
 
 You should see `Cassandra | hadesarchitect-cassandra-datasource | cassandra:9042 | cassandra-ds`.
 
+### Dashboard Layout (top-to-bottom)
+
+| Row | Panel | Source table | Notes |
+|-----|-------|--------------|-------|
+| KPIs (y=0) | Active Vehicles · Pending Requests · Trips by Status · Trips Today | `demand_zones`, `trips` | Live; "Trips by Status" + "Trips Today" use the `${replay_date}` variable (defaults to today's UTC date). |
+| Map (y=4) | Vehicle Positions (Live) | `vehicle_positions` | 16 per-zone queries, merged. |
+| Bar (y=4) | Vehicles per Zone | `vehicle_positions` | Bar chart works because `zone_id` is cast to string via a `convertFieldType` transform — required by Grafana 10 bar charts. |
+| Map (y=20) | Trip Requests — Origins/Destinations | `trips` | Filters on `date_bucket = ${replay_date}`. |
+| Table (y=36) | Recent GPS Events | `vehicle_positions` | Sorted DESC by `event_time`. |
+| Bar (y=46) | Demand vs Supply by Zone | `demand_zones` | Same `convertFieldType` fix as above. |
+| Table (y=46) | Demand Zone Details | `demand_zones` | Latest 5 windows per zone. |
+| Table (y=56) | Trip Matching Results | `trips` | One query against `${replay_date}` (no historical hard-coded date). |
+
+The `${replay_date}` template variable is a textbox that defaults to `${__from:date:YYYY-MM-DD}` — the UTC date at the start of the dashboard time range. Override it to inspect a historical replay date (the partition key for `trips`).
+
+### Simulation Modes
+
+Two demo personas are supported via env vars consumed by `trip-producer`. They only affect *where* trip requests originate / terminate; vehicle GPS trajectories are unaffected.
+
+| Mode | `TRIP_ZONE_MODE` | What it does |
+|------|------------------|--------------|
+| Organic *(default)* | `organic` | Replays Phase-4 parquet origin/destination zones as-is. Reflects the synthetic HCP/Glovo spatial prior. |
+| **Balanced demo** | `balanced` | Uniform 1/16 weight across all 16 zones. Every zone visibly receives demand. |
+| **Stress demo** | `stress` | Concentrates `TRIP_STRESS_FRACTION` (default `0.7`) of trips on `TRIP_STRESS_HOT_ZONES` (default `1,2,3`); `TRIP_STRESS_COLD_ZONES` (default `13,16`) get a 1% residual; remaining zones share the rest. Produces visible `no_vehicle` matches in the Trip Matching table. |
+
+Example:
+
+```powershell
+# Balanced demo — every zone shows trips
+$env:TRIP_ZONE_MODE = "balanced"
+docker compose up -d --force-recreate trip-producer
+
+# Stress demo — overload zone 7 specifically
+$env:TRIP_ZONE_MODE = "stress"
+$env:TRIP_STRESS_HOT_ZONES = "7"
+$env:TRIP_STRESS_FRACTION = "0.8"
+docker compose up -d --force-recreate trip-producer
+```
+
+The GPS producer always emits realistic per-ping speeds derived from consecutive positions (`speed_kmh = compute_speed(prev, cur, ping_interval)`); intermediate pings with speed `< 1 km/h` are labelled `idle` instead of `moving` to keep `status` consistent with `speed`.
+
+### Demo Healthcheck
+
+```powershell
+.\scripts\demo-healthcheck.ps1
+```
+
+Checks (read-only, no volumes touched by default):
+
+1. `docker compose config` is valid.
+2. All 9 required containers are healthy / running.
+3. The 3 Flink jobs (`GPS Normalizer`, `Demand Aggregator`, `Trip Matcher`) are `RUNNING`.
+4. `vehicle_positions` latest row is within `-MaxGpsAgeSeconds` (default 30s).
+5. `demand_zones` latest row is within `-MaxDemandAgeSeconds` (default 90s).
+6. At least one trip exists in today's UTC `date_bucket`.
+7. Prints service URLs.
+
+`-Reset` is opt-in and prompts for an explicit `DESTROY` confirmation before running `docker compose down -v`. Volumes are **never** removed by default.
+
 ### Security Notes (Demo vs Production)
 
 - Demo mode uses weak defaults from `.env.example` (`minioadmin`, `admin`, sample JWT secret) to keep local startup friction low.

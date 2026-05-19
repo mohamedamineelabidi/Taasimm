@@ -198,7 +198,51 @@ def run(max_trips, base_rate):
         log.info("=== DONE === Sent %d trip request events", sent)
 
 
-def run_from_parquet(parquet_path, max_trips, speed):
+def _parse_zone_csv(env_value, default):
+    if env_value is None or env_value == "":
+        return list(default)
+    out = []
+    for tok in env_value.split(","):
+        tok = tok.strip()
+        if tok and tok.lstrip("-").isdigit():
+            out.append(int(tok))
+    return out or list(default)
+
+
+def _build_zone_weights(zone_ids, mode, hot_zones, cold_zones, stress_fraction):
+    """Return list[float] weights aligned with zone_ids.
+
+    Modes:
+      - organic  : all 1.0 (caller should NOT use weights, fall through to parquet)
+      - balanced : uniform 1/N across all 16 zones
+      - stress   : `stress_fraction` of probability mass on hot_zones,
+                   the rest spread across non-hot/non-cold zones,
+                   cold_zones get a tiny residual (1%).
+    """
+    n = len(zone_ids)
+    if mode == "balanced":
+        return [1.0 / n] * n
+    if mode == "stress":
+        hot = set(int(z) for z in hot_zones)
+        cold = set(int(z) for z in cold_zones)
+        hot_count = sum(1 for z in zone_ids if z in hot)
+        cold_count = sum(1 for z in zone_ids if z in cold)
+        warm_count = max(1, n - hot_count - cold_count)
+        residual = 0.01
+        warm_mass = max(0.0, 1.0 - stress_fraction - residual)
+        per_hot = (stress_fraction / max(1, hot_count)) if hot_count else 0.0
+        per_cold = (residual / max(1, cold_count)) if cold_count else 0.0
+        per_warm = warm_mass / warm_count
+        return [
+            per_hot if z in hot else (per_cold if z in cold else per_warm)
+            for z in zone_ids
+        ]
+    return [1.0] * n  # organic / unknown
+
+
+def run_from_parquet(parquet_path, max_trips, speed,
+                     zone_mode="organic", hot_zones=None,
+                     cold_zones=None, stress_fraction=0.7):
     """Replay Phase-4 Casa synth trip requests at wall-clock rebased cadence.
 
     Reads casa_trip_requests.parquet (500k rows, 90 days), sorts by request_time,
@@ -219,6 +263,27 @@ def run_from_parquet(parquet_path, max_trips, speed):
 
     zones = {z["zone_id"]: z for z in load_zone_mapping()}
     h3_lookup = load_h3_lookup()
+
+    # ── Zone-mode weighting (balanced-demo / stress-demo) ──────────
+    zone_id_list = sorted(zones.keys())
+    use_weights = zone_mode in ("balanced", "stress")
+    if use_weights:
+        hot_zones = hot_zones or []
+        cold_zones = cold_zones or []
+        zone_weights = _build_zone_weights(
+            zone_id_list, zone_mode, hot_zones, cold_zones, stress_fraction
+        )
+        log.info(
+            "Zone-mode=%s | hot=%s | cold=%s | stress_fraction=%.2f",
+            zone_mode, hot_zones, cold_zones, stress_fraction,
+        )
+        log.info(
+            "Zone weights: %s",
+            {z: round(w, 4) for z, w in zip(zone_id_list, zone_weights)},
+        )
+    else:
+        zone_weights = None
+        log.info("Zone-mode=organic (replaying parquet zones as-is)")
 
     # Wall-clock rebase: make first trip fire ~now
     t0_src = df["request_time"].iloc[0].to_pydatetime()
@@ -243,6 +308,28 @@ def run_from_parquet(parquet_path, max_trips, speed):
             d = zones.get(int(row.dest_zone_id))
             if o is None or d is None:
                 continue
+
+            # Override origin/dest zones with weighted picks when in
+            # balanced or stress mode (keeps parquet timing + attributes
+            # but redirects spatial distribution for demo control).
+            if use_weights:
+                origin_zone_id = random.choices(zone_id_list, weights=zone_weights, k=1)[0]
+                dest_zone_id = random.choices(zone_id_list, weights=zone_weights, k=1)[0]
+                # Avoid trivial same-zone trips when possible
+                tries = 0
+                while dest_zone_id == origin_zone_id and tries < 5:
+                    dest_zone_id = random.choices(zone_id_list, weights=zone_weights, k=1)[0]
+                    tries += 1
+                o = zones[origin_zone_id]
+                d = zones[dest_zone_id]
+                origin_zone_name = o.get("zone_name", str(origin_zone_id))
+                dest_zone_name = d.get("zone_name", str(dest_zone_id))
+            else:
+                origin_zone_id = int(row.origin_zone_id)
+                dest_zone_id = int(row.dest_zone_id)
+                origin_zone_name = str(row.origin_zone_name)
+                dest_zone_name = str(row.dest_zone_name)
+
             o_lat = random.uniform(o["lat_min"], o["lat_max"])
             o_lon = random.uniform(o["lon_min"], o["lon_max"])
             d_lat = random.uniform(d["lat_min"], d["lat_max"])
@@ -255,14 +342,14 @@ def run_from_parquet(parquet_path, max_trips, speed):
             event = {
                 "trip_id": str(row.trip_id),
                 "rider_id": rider_id,
-                "origin_zone": int(row.origin_zone_id),
-                "origin_zone_name": str(row.origin_zone_name),
+                "origin_zone": origin_zone_id,
+                "origin_zone_name": origin_zone_name,
                 "origin_class": str(row.origin_class),
                 "origin_lat": round(o_lat, 6),
                 "origin_lon": round(o_lon, 6),
                 "origin_h3": o_h3,
-                "destination_zone": int(row.dest_zone_id),
-                "dest_zone_name": str(row.dest_zone_name),
+                "destination_zone": dest_zone_id,
+                "dest_zone_name": dest_zone_name,
                 "dest_class": str(row.dest_class),
                 "dest_lat": round(d_lat, 6),
                 "dest_lon": round(d_lon, 6),
@@ -279,9 +366,9 @@ def run_from_parquet(parquet_path, max_trips, speed):
             producer.send(TOPIC_TRIPS, key=rider_id, value=event)
             sent += 1
             if sent % 100 == 0:
-                log.info("Sent %d trips (hour=%d, last_zone=%d->%s, fare=%.1f MAD, %s)",
-                         sent, now.hour, int(row.origin_zone_id),
-                         int(row.dest_zone_id), float(row.fare_mad), str(row.fleet_type))
+                log.info("Sent %d trips (hour=%d, last_zone=%d->%d, fare=%.1f MAD, %s)",
+                         sent, now.hour, origin_zone_id,
+                         dest_zone_id, float(row.fare_mad), str(row.fleet_type))
     except KeyboardInterrupt:
         log.info("Interrupted by user")
     finally:
@@ -302,8 +389,44 @@ if __name__ == "__main__":
                         help="[casa_synth mode] Replay speed multiplier (default: 10x)")
     parser.add_argument("--parquet", default=PHASE4_TRIPS_PARQUET,
                         help="[casa_synth mode] Path to trip-requests parquet")
+    parser.add_argument(
+        "--zone-mode",
+        choices=["organic", "balanced", "stress"],
+        default=os.getenv("TRIP_ZONE_MODE", "organic"),
+        help=(
+            "Trip origin/destination spatial distribution. "
+            "organic = replay parquet zones as-is (default). "
+            "balanced = uniform across all 16 zones (demo: all zones visible). "
+            "stress = heavy weight on --stress-hot-zones, near-zero on --stress-cold-zones. "
+            "Env override: TRIP_ZONE_MODE."
+        ),
+    )
+    parser.add_argument(
+        "--stress-hot-zones",
+        default=os.getenv("TRIP_STRESS_HOT_ZONES", "1,2,3"),
+        help="Comma-separated zone IDs that receive `stress_fraction` of trips. Env: TRIP_STRESS_HOT_ZONES.",
+    )
+    parser.add_argument(
+        "--stress-cold-zones",
+        default=os.getenv("TRIP_STRESS_COLD_ZONES", "13,16"),
+        help="Comma-separated zone IDs that get a near-zero residual (1%%). Env: TRIP_STRESS_COLD_ZONES.",
+    )
+    parser.add_argument(
+        "--stress-fraction",
+        type=float,
+        default=float(os.getenv("TRIP_STRESS_FRACTION", "0.7")),
+        help="Fraction of trips concentrated on hot zones in stress mode (default 0.7). Env: TRIP_STRESS_FRACTION.",
+    )
     args = parser.parse_args()
     if args.source == "casa_synth":
-        run_from_parquet(args.parquet, args.max_trips, args.speed)
+        run_from_parquet(
+            args.parquet,
+            args.max_trips,
+            args.speed,
+            zone_mode=args.zone_mode,
+            hot_zones=_parse_zone_csv(args.stress_hot_zones, [1, 2, 3]),
+            cold_zones=_parse_zone_csv(args.stress_cold_zones, [13, 16]),
+            stress_fraction=args.stress_fraction,
+        )
     else:
         run(args.max_trips, args.base_rate)
