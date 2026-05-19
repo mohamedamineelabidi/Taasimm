@@ -6,7 +6,10 @@ datasources:
     access: proxy
     isDefault: true
     uid: cassandra-ds
-    url: "172.28.0.5:9042"
+    # Resolve via the Docker network alias rather than a hard-coded IP.
+    # The cassandra service is pinned to 172.28.0.20 in docker-compose.yml,
+    # but the alias is stable across compose re-creates and ipam tweaks.
+    url: "cassandra:9042"
     jsonData:
       keyspace: taasim
       consistency: ONE

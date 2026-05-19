@@ -234,6 +234,37 @@ docker compose up -d --build --force-recreate gps-producer trip-producer
 | FastAPI (Swagger) | http://localhost:8000/docs | JWT (see [§Machine Learning](#machine-learning)) |
 | Jupyter Lab | http://localhost:8888 | token from `docker logs taasim-jupyter` |
 
+### Grafana — How It Is Wired
+
+Grafana 10.4 is fully provisioned from `config/` at container start; no manual setup is required.
+
+- **Datasource** — `config/grafana-datasource.yml` provisions one read-only Cassandra datasource:
+  - name `Cassandra`, uid `cassandra-ds`, plugin `hadesarchitect-cassandra-datasource`
+  - url `cassandra:9042` (resolves to the `cassandra` service alias on the `172.28.0.0/16` Docker network)
+  - keyspace `taasim`, consistency `ONE`
+- **Dashboard** — `config/grafana-dashboard.json` ("TaaSim — Live Pipeline (Casablanca)") is auto-loaded via `config/grafana-dashboard-provisioning.yml` (updateIntervalSeconds: 30, allowUiUpdates: true). All panels reference `uid: cassandra-ds` and run raw CQL against the keyspace `taasim`.
+- **Tables read by Grafana** — populated only by the Flink jobs:
+  - `taasim.vehicle_positions` ← Job 1 `gps_normalizer` (live taxi map)
+  - `taasim.demand_zones` ← Job 2 `demand_aggregator` (demand heatmap + KPIs)
+  - `taasim.trips` ← Job 3 `trip_matcher` (matched trips)
+- **No direct Kafka read.** Grafana does not connect to Kafka. The path is always `producers → Kafka → Flink → Cassandra → Grafana`.
+
+To apply changes to the datasource yml, restart Grafana so provisioning re-runs:
+
+```powershell
+docker restart taasim-grafana
+```
+
+Quick datasource sanity check from the host:
+
+```powershell
+$h = @{ Authorization = "Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("admin:admin")) }
+Invoke-RestMethod -Uri "http://localhost:3000/api/datasources" -Headers $h |
+  Select-Object name, type, url, uid
+```
+
+You should see `Cassandra | hadesarchitect-cassandra-datasource | cassandra:9042 | cassandra-ds`.
+
 ### Security Notes (Demo vs Production)
 
 - Demo mode uses weak defaults from `.env.example` (`minioadmin`, `admin`, sample JWT secret) to keep local startup friction low.
